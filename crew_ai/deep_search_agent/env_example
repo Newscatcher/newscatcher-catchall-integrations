@@ -1,0 +1,4 @@
+MODEL=gemini/gemini-2.5-flash
+CHAT_MODEL=gemini-2.5-flash
+GEMINI_API_KEY=your-key
+NEWSCATCHER_API_KEY=your-key

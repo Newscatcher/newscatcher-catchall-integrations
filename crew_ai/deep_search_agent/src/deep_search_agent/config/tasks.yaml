@@ -1,0 +1,118 @@
+plan_search_query:
+  description: >
+    Analyze the user's research prompt and create an optimal search query
+    for the CatchAll API.
+    
+    USER PROMPT:
+    {user_prompt}
+    
+    ITERATION: {iteration_number} of max {max_iterations}
+    
+    PREVIOUS QUERIES (if any):
+    {previous_queries}
+    
+    PREVIOUS RESULTS SUMMARY (if any):
+    {previous_results_summary}
+    
+    Your task:
+    1. Understand what the user is really looking for
+    2. Identify the key entities, events, and constraints
+    3. Craft a search query following CatchAll best practices:
+       - Target newsworthy events (acquisitions, launches, funding, etc.)
+       - Include 2-4 constraints (industry, geography, time, threshold)
+       - Be specific enough to get relevant results
+       - Be broad enough to capture comprehensive coverage
+    4. Create an appropriate context for extraction guidance
+    5. Define a schema for structured data extraction if useful
+    
+    If this is a retry (iteration > 1), adjust your query based on
+    what didn't work before. Try different angles or broader/narrower scope.
+    
+  expected_output: >
+    A JSON object with the following structure:
+    {
+      "query": "The optimized search query for CatchAll API",
+      "context": "Additional context for extraction guidance",
+      "schema": "Optional structured schema for data extraction",
+      "reasoning": "Brief explanation of why this query should work"
+    }
+  agent: query_strategist
+
+evaluate_results:
+  description: >
+    Evaluate the search results to determine if they adequately answer
+    the user's research question.
+    
+    ORIGINAL USER PROMPT:
+    {user_prompt}
+    
+    CURRENT QUERY:
+    {current_query}
+    
+    SEARCH RESULTS:
+    {search_results}
+    
+    ITERATION: {iteration_number} of max {max_iterations}
+    
+    Your task:
+    1. Assess the relevance of results to the user's question
+    2. Check the number and quality of records found
+    3. Identify any gaps or missing aspects
+    4. Determine if results are sufficient or if retry is needed
+    
+    Consider these factors:
+    - 0 valid records = definitely needs retry with different query
+    - Low relevance = needs retry with adjusted focus
+    - Missing key aspects = might need additional targeted search
+    - Good coverage = results are sufficient
+    
+  expected_output: >
+    A JSON object with the following structure:
+    {
+      "is_sufficient": true/false,
+      "quality_score": 1-10,
+      "records_found": number,
+      "relevance_assessment": "Brief description of how relevant results are",
+      "gaps_identified": ["List of missing aspects if any"],
+      "retry_recommendation": "Suggested query adjustment if retry needed",
+      "key_findings": ["List of key findings from results"]
+    }
+  agent: result_evaluator
+
+synthesize_research:
+  description: >
+    Compile all search results into a comprehensive research report
+    that fully answers the user's original question.
+    
+    ORIGINAL USER PROMPT:
+    {user_prompt}
+    
+    ALL SEARCH RESULTS:
+    {all_results}
+    
+    SEARCH ITERATIONS SUMMARY:
+    {iterations_summary}
+    
+    Your task:
+    1. Synthesize all findings into a coherent narrative
+    2. Organize information by themes or topics
+    3. Highlight the most important findings
+    4. Include proper source citations with links
+    5. Provide actionable conclusions
+    
+    Structure your report like deep research output:
+    - Start with an executive summary
+    - Break down findings by topic/theme
+    - Include specific data points and quotes
+    - Cite sources throughout with links
+    - End with key takeaways and conclusions
+    
+  expected_output: >
+    A comprehensive research report in markdown format that:
+    1. Directly answers the user's research question
+    2. Provides detailed findings organized by topic
+    3. Includes proper citations with source links
+    4. Offers actionable insights and conclusions
+    5. Notes any limitations or areas for further research
+  agent: research_synthesizer
+

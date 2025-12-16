@@ -1,0 +1,85 @@
+gather_risk_intelligence:
+  description: >
+    Analyze supply chain risk data from Newscatcher API containing {valid_records}
+    validated records affecting EU automotive manufacturers.
+    
+    Tasks:
+    1. Process all news records
+    2. Extract risk signals
+    3. Identify global events and disruptions
+    4. Note affected manufacturers, suppliers, components
+    5. Extract impact data (financial, jobs, production)
+    
+    Date Range: {date_range_start} to {date_range_end}
+    Manufacturers: {target_manufacturers}
+    Focus: {focus_areas}
+    
+    NEWS DATA:
+    {news_data}
+  expected_output: >
+    Intelligence brief with:
+    - Risk event count
+    - Global context summary
+    - For each risk: title, what's happening, affected entities, impact, sources
+  agent: news_intelligence_officer
+
+analyze_and_categorize_risks:
+  description: >
+    Categorize risks from Stage 1 for {target_manufacturers}.
+    
+    Categories:
+    - SEMICONDUCTOR_SHORTAGE
+    - RAW_MATERIAL_SCARCITY
+    - LOGISTICS_DELAY
+    - LABOR_DISRUPTION
+    - GEOPOLITICAL
+    - SUPPLIER_FINANCIAL
+    - ENERGY_CRISIS
+    - COMPETITION
+    - OTHER
+    
+    For each risk provide: category, severity (CRITICAL/HIGH/MEDIUM/LOW),
+    global context, business impact.
+  expected_output: >
+    Categorized risk report with:
+    - Risk count by category
+    - For each risk: category, severity, what's happening, impact,
+      affected manufacturers, components, timeline, sources
+  agent: risk_analyst
+  context:
+    - gather_risk_intelligence
+
+generate_executive_report:
+  description: >
+    Create executive risk summary for {target_manufacturers}.
+    
+    Requirements:
+    - Organize by category
+    - Explain what's happening globally
+    - Summarize business impact
+    - Use severity indicators
+    - Be concise
+    
+    Date: {current_date}
+    Period: {date_range_start} to {date_range_end}
+  expected_output: >
+    # EU AUTOMOTIVE SUPPLY CHAIN RISK REPORT
+    
+    ## Risk Dashboard
+    Table with category, count, highest severity
+    
+    ## Critical/High Risks
+    For each: category, title, severity, what's happening, impact, affected OEMs, timeline, sources
+    
+    ## Medium Risks
+    Summary table
+    
+    ## Low/Monitoring
+    Brief list
+    
+    ## Key Metrics
+    Financial exposure, jobs affected, production at risk
+  agent: executive_report_analyst
+  context:
+    - gather_risk_intelligence
+    - analyze_and_categorize_risks

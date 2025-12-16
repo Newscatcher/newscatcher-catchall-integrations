@@ -1,0 +1,36 @@
+[project]
+name = "deep_search_agent"
+version = "1.0.0"
+description = "Deep Search Agent using CrewAI Flows for iterative news research"
+authors = [{ name = "Your Name", email = "you@example.com" }]
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "crewai[google-genai,tools]>=0.86.0",
+    "newscatcher-catchall-sdk>=0.2.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "google-generativeai>=0.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+deep_search = "deep_search_agent.main:main"
+kickoff = "deep_search_agent.main:run"
+run_flow = "deep_search_agent.main:run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.crewai]
+type = "flow"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/deep_search_agent"]
