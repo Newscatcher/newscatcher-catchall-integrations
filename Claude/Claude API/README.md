@@ -85,5 +85,5 @@ run_agent("your query", model="claude-haiku-3-5-20241022")   # Faster/cheaper
 
 ## API Keys
 
-- **CatchAll API Key**: Get one at [newscatcherapi.com](https://www.newscatcherapi.com/)
+- **CatchAll API Key**: Get one at [https://platform.newscatcherapi.com/](https://platform.newscatcherapi.com/)
 - **Anthropic API Key**: Get one at [console.anthropic.com](https://console.anthropic.com/)
