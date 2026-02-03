@@ -67,16 +67,48 @@ Find funding rounds for fintech startups in the last month
 
 ## Handling Results
 
-Results contain:
-- `clusters`: Groups of related articles with summaries
-- `total_articles`: Total articles found
-- `cluster_count`: Number of distinct story clusters
+Response from `pull_results` contains:
+
+| Field | Description |
+|-------|-------------|
+| `job_id` | The job identifier |
+| `query` | Original search query |
+| `status` | Job status (e.g., "Job Completed") |
+| `duration` | Processing time (e.g., "16m") |
+| `candidate_records` | Total articles scanned |
+| `valid_records` | Articles that passed validation |
+| `date_range` | Object with `start_date` and `end_date` |
+| `validators` | List of validation criteria used |
+| `enrichments` | List of extracted data fields |
+| `all_records` | Array of validated records |
+
+Each record in `all_records` contains:
+
+```json
+{
+  "record_id": "unique-id",
+  "record_title": "Summary title of the event/story",
+  "enrichment": {
+    // Extracted structured data - varies by query type
+    // Examples: deal_value, deal_type, acquired_company, etc.
+    "confidence": "high"
+  },
+  "citations": [
+    {
+      "title": "Source article title",
+      "link": "https://source-url.com/article",
+      "published_date": "2026-01-30T14:25:04Z"
+    }
+  ]
+}
+```
 
 When presenting results:
-1. Summarize key findings across clusters
-2. Highlight notable sources
-3. Note the time range covered
-4. Offer to search for related topics if needed
+1. Summarize the total records found vs candidates scanned
+2. Present key findings from the `record_title` and `enrichment` fields
+3. Include source citations with links
+4. Note the date range covered
+5. Offer to search for related topics if needed
 
 ## Status Progression
 
