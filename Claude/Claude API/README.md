@@ -11,7 +11,7 @@ pip install -r requirements.txt
 
 Create `.env` or export environment variables:
 ```bash
-export NEWSCATCHER_API_KEY=your-newscatcher-key
+export CATCHALL_API_KEY=your-catchall-key
 export ANTHROPIC_API_KEY=your-anthropic-key
 ```
 
@@ -32,7 +32,7 @@ response = run_agent("Find news about AI acquisitions in the last week")
 ## How it works
 
 1. **User Query** - You provide a natural language request
-2. **Tool Selection** - Claude decides which Newscatcher tools to use
+2. **Tool Selection** - Claude decides which CatchAll tools to use
 3. **Submit** - Calls `submit_query` to start a news search job
 4. **Poll** - Calls `get_job_status` until job is completed
 5. **Retrieve** - Calls `pull_results` to get clustered articles
@@ -85,5 +85,5 @@ run_agent("your query", model="claude-haiku-3-5-20241022")   # Faster/cheaper
 
 ## API Keys
 
-- **Newscatcher API Key**: Get one at [newscatcherapi.com](https://www.newscatcherapi.com/)
+- **CatchAll API Key**: Get one at [newscatcherapi.com](https://www.newscatcherapi.com/)
 - **Anthropic API Key**: Get one at [console.anthropic.com](https://console.anthropic.com/)

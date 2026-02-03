@@ -2,11 +2,11 @@
 name: newscatcher-catchall
 description: Search and analyze news articles using natural language queries via Newscatcher CatchAll API. Use when users ask for news research, market intelligence, competitive analysis, or current events monitoring.
 license: MIT
-compatibility: Requires NEWSCATCHER_API_KEY environment variable or api_key parameter. Network access to catchall.newscatcherapi.com required.
+compatibility: Requires CATCHALL_API_KEY environment variable or api_key parameter. Network access to catchall.newscatcherapi.com required.
 metadata:
   author: Newscatcher
   version: "1.0"
-  api-docs: https://docs.newscatcherapi.com/
+  api-docs: https://www.newscatcherapi.com/docs/v3/catch-all/overview/introduction
 ---
 
 # Newscatcher CatchAll News Search

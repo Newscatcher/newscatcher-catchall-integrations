@@ -8,7 +8,7 @@ Requirements:
     pip install anthropic httpx
 
 Usage:
-    export NEWSCATCHER_API_KEY="your_api_key"
+    export CATCHALL_API_KEY="your_api_key"
     export ANTHROPIC_API_KEY="your_anthropic_key"
     python claude_api_example.py
 """
@@ -20,8 +20,8 @@ import anthropic
 import httpx
 
 # Configuration
-NEWSCATCHER_API_KEY = os.environ.get("NEWSCATCHER_API_KEY")
-NEWSCATCHER_BASE_URL = "https://catchall.newscatcherapi.com"
+CATCHALL_API_KEY = os.environ.get("CATCHALL_API_KEY")
+CATCHALL_BASE_URL = "https://catchall.newscatcherapi.com"
 
 # Initialize Anthropic client
 client = anthropic.Anthropic()
@@ -118,23 +118,23 @@ TOOLS = [
 ]
 
 
-def call_newscatcher_api(
+def call_catchall_api(
     method: str,
     path: str,
     json_data: dict | None = None,
     params: dict | None = None
 ) -> dict:
-    """Make a request to the Newscatcher CatchAll API."""
-    if not NEWSCATCHER_API_KEY:
-        raise ValueError("NEWSCATCHER_API_KEY environment variable is not set")
+    """Make a request to the CatchAll API."""
+    if not CATCHALL_API_KEY:
+        raise ValueError("CATCHALL_API_KEY environment variable is not set")
 
     headers = {
-        "x-api-key": NEWSCATCHER_API_KEY,
+        "x-api-key": CATCHALL_API_KEY,
         "Content-Type": "application/json",
         "Accept": "application/json"
     }
 
-    with httpx.Client(base_url=NEWSCATCHER_BASE_URL, timeout=60.0) as http_client:
+    with httpx.Client(base_url=CATCHALL_BASE_URL, timeout=60.0) as http_client:
         response = http_client.request(
             method=method,
             url=path,
@@ -155,23 +155,23 @@ def call_newscatcher_api(
 
 
 def execute_tool(tool_name: str, tool_input: dict) -> str:
-    """Execute a Newscatcher tool and return the result as a string."""
+    """Execute a CatchAll tool and return the result as a string."""
     try:
         if tool_name == "submit_query":
-            result = call_newscatcher_api(
+            result = call_catchall_api(
                 method="POST",
                 path="/catchAll/submit",
                 json_data={"query": tool_input["query"]}
             )
 
         elif tool_name == "get_job_status":
-            result = call_newscatcher_api(
+            result = call_catchall_api(
                 method="GET",
                 path=f"/catchAll/status/{tool_input['job_id']}"
             )
 
         elif tool_name == "pull_results":
-            result = call_newscatcher_api(
+            result = call_catchall_api(
                 method="GET",
                 path=f"/catchAll/pull/{tool_input['job_id']}",
                 params={
@@ -181,13 +181,13 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             )
 
         elif tool_name == "list_user_jobs":
-            result = call_newscatcher_api(
+            result = call_catchall_api(
                 method="GET",
                 path="/catchAll/jobs/user"
             )
 
         elif tool_name == "continue_job":
-            result = call_newscatcher_api(
+            result = call_catchall_api(
                 method="POST",
                 path="/catchAll/continue",
                 json_data={"job_id": tool_input["job_id"]}
@@ -206,7 +206,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
 def run_agent(user_message: str, model: str = "claude-sonnet-4-20250514") -> str:
     """
-    Run an agentic loop with Claude using Newscatcher tools.
+    Run an agentic loop with Claude using CatchAll tools.
 
     Args:
         user_message: The user's request
@@ -276,9 +276,9 @@ def run_agent(user_message: str, model: str = "claude-sonnet-4-20250514") -> str
 # Example usage
 if __name__ == "__main__":
     # Check for required environment variables
-    if not NEWSCATCHER_API_KEY:
-        print("Error: Please set NEWSCATCHER_API_KEY environment variable")
-        print("  export NEWSCATCHER_API_KEY='your_api_key'")
+    if not CATCHALL_API_KEY:
+        print("Error: Please set CATCHALL_API_KEY environment variable")
+        print("  export CATCHALL_API_KEY='your_api_key'")
         exit(1)
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
