@@ -15,16 +15,42 @@ Usage:
 
 import json
 import os
+import time
 
 import anthropic
 import httpx
 
 # Configuration
-CATCHALL_API_KEY = os.environ.get("CATCHALL_API_KEY")
 CATCHALL_BASE_URL = "https://catchall.newscatcherapi.com"
+CATCHALL_API_KEY = os.environ.get("CATCHALL_API_KEY")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 
 # Initialize Anthropic client
-client = anthropic.Anthropic()
+client = None
+
+
+def get_client():
+    """Get or initialize the Anthropic client."""
+    global client
+    if client is None:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    return client
+
+
+def configure(catchall_api_key: str = None, anthropic_api_key: str = None):
+    """
+    Configure API keys programmatically.
+
+    Args:
+        catchall_api_key: Your CatchAll API key
+        anthropic_api_key: Your Anthropic API key
+    """
+    global CATCHALL_API_KEY, ANTHROPIC_API_KEY, client
+    if catchall_api_key:
+        CATCHALL_API_KEY = catchall_api_key
+    if anthropic_api_key:
+        ANTHROPIC_API_KEY = anthropic_api_key
+        client = None  # Reset client to use new key
 
 # Define tools for Claude
 TOOLS = [
@@ -33,7 +59,8 @@ TOOLS = [
         "description": (
             "Submit a natural language query to search for news articles. "
             "The system will fetch, validate, cluster, and summarize relevant articles. "
-            "Returns a job_id that you'll use to check status and retrieve results."
+            "Returns a job_id. After submitting, wait 30 seconds before calling pull_results "
+            "for the first time - results stream in gradually as processing continues."
         ),
         "input_schema": {
             "type": "object",
@@ -47,29 +74,13 @@ TOOLS = [
         }
     },
     {
-        "name": "get_job_status",
-        "description": (
-            "Check the status of a submitted job. "
-            "Status progression: submitted -> analyzing -> fetching -> clustering -> enriching -> completed. "
-            "Keep polling until status is 'completed' before pulling results."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "job_id": {
-                    "type": "string",
-                    "description": "The job ID returned from submit_query"
-                }
-            },
-            "required": ["job_id"]
-        }
-    },
-    {
         "name": "pull_results",
         "description": (
-            "Retrieve the results of a completed job. "
-            "Only call this after get_job_status shows the job is 'completed'. "
-            "Returns clustered and summarized news articles."
+            "Retrieve results for a job. Supports streaming - wait 30 seconds after submit_query, then call this. "
+            "Results appear gradually as processing continues. The response includes 'status' field - "
+            "if not 'completed', more results may be available later. Poll every 1 minute to get new results. "
+            "When you get results but status is not 'completed', show the user what's available so far "
+            "and let them know more results are coming. Returns clustered and summarized news articles."
         ),
         "input_schema": {
             "type": "object",
@@ -87,6 +98,25 @@ TOOLS = [
                     "type": "integer",
                     "description": "Number of results per page (default: 100, max: 100)",
                     "default": 100
+                }
+            },
+            "required": ["job_id"]
+        }
+    },
+    {
+        "name": "get_job_status",
+        "description": (
+            "Check the status of a submitted job. "
+            "Status progression: submitted -> analyzing -> fetching -> clustering -> enriching -> completed. "
+            "Note: With streaming, you don't need to wait for 'completed' - use pull_results directly "
+            "to get partial results as they become available."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "job_id": {
+                    "type": "string",
+                    "description": "The job ID returned from submit_query"
                 }
             },
             "required": ["job_id"]
@@ -154,126 +184,7 @@ def call_catchall_api(
         return response.json()
 
 
-def execute_tool(tool_name: str, tool_input: dict) -> str:
-    """Execute a CatchAll tool and return the result as a string."""
-    try:
-        if tool_name == "submit_query":
-            result = call_catchall_api(
-                method="POST",
-                path="/catchAll/submit",
-                json_data={"query": tool_input["query"]}
-            )
-
-        elif tool_name == "get_job_status":
-            result = call_catchall_api(
-                method="GET",
-                path=f"/catchAll/status/{tool_input['job_id']}"
-            )
-
-        elif tool_name == "pull_results":
-            result = call_catchall_api(
-                method="GET",
-                path=f"/catchAll/pull/{tool_input['job_id']}",
-                params={
-                    "page": tool_input.get("page", 1),
-                    "page_size": tool_input.get("page_size", 100)
-                }
-            )
-
-        elif tool_name == "list_user_jobs":
-            result = call_catchall_api(
-                method="GET",
-                path="/catchAll/jobs/user"
-            )
-
-        elif tool_name == "continue_job":
-            result = call_catchall_api(
-                method="POST",
-                path="/catchAll/continue",
-                json_data={"job_id": tool_input["job_id"]}
-            )
-
-        else:
-            return f"Error: Unknown tool '{tool_name}'"
-
-        return json.dumps(result, indent=2)
-
-    except ValueError as e:
-        return f"Error: {str(e)}"
-    except Exception as e:
-        return f"Unexpected error: {str(e)}"
-
-
-def run_agent(user_message: str, model: str = "claude-sonnet-4-20250514") -> str:
-    """
-    Run an agentic loop with Claude using CatchAll tools.
-
-    Args:
-        user_message: The user's request
-        model: Claude model to use
-
-    Returns:
-        Claude's final text response
-    """
-    messages = [{"role": "user", "content": user_message}]
-
-    print(f"\n{'='*60}")
-    print(f"User: {user_message}")
-    print('='*60)
-
-    while True:
-        response = client.messages.create(
-            model=model,
-            max_tokens=4096,
-            tools=TOOLS,
-            messages=messages
-        )
-
-        # Check if Claude wants to use tools
-        if response.stop_reason == "tool_use":
-            tool_results = []
-
-            for block in response.content:
-                if block.type == "tool_use":
-                    tool_name = block.name
-                    tool_input = block.input
-
-                    print(f"\n🔧 Tool: {tool_name}")
-                    print(f"   Input: {json.dumps(tool_input)}")
-
-                    # Execute the tool
-                    result = execute_tool(tool_name, tool_input)
-
-                    # Show truncated result
-                    preview = result[:200] + "..." if len(result) > 200 else result
-                    print(f"   Result: {preview}")
-
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": result
-                    })
-
-            # Add assistant response and tool results to conversation
-            messages.append({"role": "assistant", "content": response.content})
-            messages.append({"role": "user", "content": tool_results})
-
-        else:
-            # Claude is done - extract and return the final text
-            final_response = ""
-            for block in response.content:
-                if hasattr(block, "text"):
-                    final_response += block.text
-
-            print(f"\n{'='*60}")
-            print("Assistant:")
-            print(final_response)
-            print('='*60)
-
-            return final_response
-
-
-# Example usage
+# Simple example without agent loop
 if __name__ == "__main__":
     # Check for required environment variables
     if not CATCHALL_API_KEY:
@@ -281,17 +192,71 @@ if __name__ == "__main__":
         print("  export CATCHALL_API_KEY='your_api_key'")
         exit(1)
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("Error: Please set ANTHROPIC_API_KEY environment variable")
-        print("  export ANTHROPIC_API_KEY='your_api_key'")
-        exit(1)
+    # Step 1: Submit a query
+    query = "Find recent news about AI startup funding rounds in the last 7 days"
+    print(f"\n{'='*60}")
+    print(f"Submitting query: {query}")
+    print('='*60)
 
-    # Example queries to try:
-    example_queries = [
-        "Find recent news about AI startup funding rounds in the last 7 days",
-        "Search for news about electric vehicle companies in Europe",
-        "What are the latest developments in quantum computing?",
-    ]
+    submit_response = call_catchall_api(
+        method="POST",
+        path="/catchAll/submit",
+        json_data={"query": query, "limit": 10}
+    )
+    job_id = submit_response["job_id"]
+    print(f"Job submitted! Job ID: {job_id}")
 
-    # Run with the first example
-    run_agent(example_queries[0])
+    # Step 2: Wait 30 seconds before first pull
+    print("\nWaiting 30 seconds before first pull...")
+    time.sleep(30)
+
+    # Step 3: Poll for results every 1 minute until job is completed
+    while True:
+        # Pull current results (streaming - returns partial data)
+        print(f"\n{'='*60}")
+        print("Pulling results...")
+        pull_response = call_catchall_api(
+            method="GET",
+            path=f"/catchAll/pull/{job_id}",
+            params={"page": 1, "page_size": 100}
+        )
+
+        status = pull_response.get("status", "unknown")
+        clusters = pull_response.get("clusters", [])
+
+        print(f"Status: {status}")
+        print(f"Clusters available: {len(clusters)}")
+
+        # Show snapshot of current data
+        if clusters:
+            print("\n--- Current Results Snapshot ---")
+            for i, cluster in enumerate(clusters[:3]):  # Show first 3 clusters
+                title = cluster.get("cluster_title", "No title")
+                article_count = len(cluster.get("articles", []))
+                print(f"  {i+1}. {title} ({article_count} articles)")
+            if len(clusters) > 3:
+                print(f"  ... and {len(clusters) - 3} more clusters")
+            print("--- End Snapshot ---")
+
+        # Check if job is completed
+        if status == "completed":
+            print(f"\n{'='*60}")
+            print("JOB COMPLETED!")
+            print('='*60)
+            print(f"\nFinal results: {len(clusters)} clusters")
+
+            # Show all final results
+            print("\n--- Final Results ---")
+            for i, cluster in enumerate(clusters):
+                title = cluster.get("cluster_title", "No title")
+                summary = cluster.get("summary", "No summary")
+                article_count = len(cluster.get("articles", []))
+                print(f"\n{i+1}. {title}")
+                print(f"   Articles: {article_count}")
+                print(f"   Summary: {summary[:200]}..." if len(summary) > 200 else f"   Summary: {summary}")
+            print("\n--- End Final Results ---")
+            break
+
+        # Job not done yet - wait 1 minute before next poll
+        print("\nJob still processing. Waiting 1 minute before next poll...")
+        time.sleep(60)
