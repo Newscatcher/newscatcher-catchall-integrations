@@ -15,16 +15,43 @@ Usage:
 
 import json
 import os
+import time
 
 import anthropic
 import httpx
 
 # Configuration
-CATCHALL_API_KEY = os.environ.get("CATCHALL_API_KEY")
 CATCHALL_BASE_URL = "https://catchall.newscatcherapi.com"
+CATCHALL_API_KEY = os.environ.get("CATCHALL_API_KEY")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 
 # Initialize Anthropic client
-client = anthropic.Anthropic()
+client = None
+
+
+def get_client():
+    """Get or initialize the Anthropic client."""
+    global client
+    if client is None:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    return client
+
+
+def configure(catchall_api_key: str = None, anthropic_api_key: str = None):
+    """
+    Configure API keys programmatically.
+
+    Args:
+        catchall_api_key: Your CatchAll API key
+        anthropic_api_key: Your Anthropic API key
+    """
+    global CATCHALL_API_KEY, ANTHROPIC_API_KEY, client
+    if catchall_api_key:
+        CATCHALL_API_KEY = catchall_api_key
+    if anthropic_api_key:
+        ANTHROPIC_API_KEY = anthropic_api_key
+        client = None  # Reset client to use new key
+
 
 # Define tools for Claude
 TOOLS = [
@@ -33,43 +60,35 @@ TOOLS = [
         "description": (
             "Submit a natural language query to search for news articles. "
             "The system will fetch, validate, cluster, and summarize relevant articles. "
-            "Returns a job_id that you'll use to check status and retrieve results."
+            "Returns a job_id. After submitting, wait 30 seconds before calling pull_results "
+            "for the first time - results stream in gradually as processing continues. "
+            "By default, limits results to 10 clusters. Set fetch_all=true only if the user "
+            "explicitly asks for ALL results (e.g., 'find all news', 'get everything')."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "Natural language query (e.g., 'Find all M&A deals in tech sector last 7 days')"
+                    "description": "Natural language query (e.g., 'Find M&A deals in tech sector last 7 days')"
+                },
+                "fetch_all": {
+                    "type": "boolean",
+                    "description": "Set to true only if user explicitly requests ALL results. Default is false (limit to 10).",
+                    "default": False
                 }
             },
             "required": ["query"]
         }
     },
     {
-        "name": "get_job_status",
-        "description": (
-            "Check the status of a submitted job. "
-            "Status progression: submitted -> analyzing -> fetching -> clustering -> enriching -> completed. "
-            "Keep polling until status is 'completed' before pulling results."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "job_id": {
-                    "type": "string",
-                    "description": "The job ID returned from submit_query"
-                }
-            },
-            "required": ["job_id"]
-        }
-    },
-    {
         "name": "pull_results",
         "description": (
-            "Retrieve the results of a completed job. "
-            "Only call this after get_job_status shows the job is 'completed'. "
-            "Returns clustered and summarized news articles."
+            "Retrieve results for a job. Supports streaming - wait 30 seconds after submit_query, then call this. "
+            "Results appear gradually as processing continues. The response includes 'status' field - "
+            "if not 'completed', more results may be available later. Poll every 1 minute to get new results. "
+            "When you get results but status is not 'completed', show the user what's available so far "
+            "and let them know more results are coming. Returns clustered and summarized news articles."
         ),
         "input_schema": {
             "type": "object",
@@ -87,6 +106,25 @@ TOOLS = [
                     "type": "integer",
                     "description": "Number of results per page (default: 100, max: 100)",
                     "default": 100
+                }
+            },
+            "required": ["job_id"]
+        }
+    },
+    {
+        "name": "get_job_status",
+        "description": (
+            "Check the status of a submitted job. "
+            "Status progression: submitted -> analyzing -> fetching -> clustering -> enriching -> completed. "
+            "Note: With streaming, you don't need to wait for 'completed' - use pull_results directly "
+            "to get partial results as they become available."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "job_id": {
+                    "type": "string",
+                    "description": "The job ID returned from submit_query"
                 }
             },
             "required": ["job_id"]
@@ -158,10 +196,14 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
     """Execute a CatchAll tool and return the result as a string."""
     try:
         if tool_name == "submit_query":
+            # If fetch_all is True, don't include limit; otherwise default to 10
+            json_data = {"query": tool_input["query"]}
+            if not tool_input.get("fetch_all", False):
+                json_data["limit"] = 10
             result = call_catchall_api(
                 method="POST",
                 path="/catchAll/submit",
-                json_data={"query": tool_input["query"]}
+                json_data=json_data
             )
 
         elif tool_name == "get_job_status":
@@ -208,6 +250,11 @@ def run_agent(user_message: str, model: str = "claude-sonnet-4-20250514") -> str
     """
     Run an agentic loop with Claude using CatchAll tools.
 
+    Handles streaming results from CatchAll API:
+    - After submit_query: waits 30 seconds before first pull
+    - After pull_results with incomplete status: waits 1 minute before next poll
+    - Shows partial results as they become available
+
     Args:
         user_message: The user's request
         model: Claude model to use
@@ -216,13 +263,15 @@ def run_agent(user_message: str, model: str = "claude-sonnet-4-20250514") -> str
         Claude's final text response
     """
     messages = [{"role": "user", "content": user_message}]
+    active_job_id = None
+    job_submitted_time = None
 
     print(f"\n{'='*60}")
     print(f"User: {user_message}")
     print('='*60)
 
     while True:
-        response = client.messages.create(
+        response = get_client().messages.create(
             model=model,
             max_tokens=4096,
             tools=TOOLS,
@@ -241,8 +290,75 @@ def run_agent(user_message: str, model: str = "claude-sonnet-4-20250514") -> str
                     print(f"\n🔧 Tool: {tool_name}")
                     print(f"   Input: {json.dumps(tool_input)}")
 
-                    # Execute the tool
-                    result = execute_tool(tool_name, tool_input)
+                    # Handle timing for streaming workflow
+                    if tool_name == "submit_query":
+                        # Execute submit
+                        result = execute_tool(tool_name, tool_input)
+
+                        # Track job for timing
+                        try:
+                            result_data = json.loads(result)
+                            if "job_id" in result_data:
+                                active_job_id = result_data["job_id"]
+                                job_submitted_time = time.time()
+                                print(f"   ⏳ Job submitted. Waiting 30 seconds before first pull...")
+                        except json.JSONDecodeError:
+                            pass
+
+                    elif tool_name == "get_job_status":
+                        # Execute status check
+                        result = execute_tool(tool_name, tool_input)
+
+                        # Format status nicely for display
+                        try:
+                            result_data = json.loads(result)
+                            steps = result_data.get("steps", [])
+                            completed_steps = sum(1 for s in steps if s.get("completed"))
+                            total_steps = len(steps) if steps else 7  # Default to 7 if no steps
+                            current_status = result_data.get("status", "unknown")
+                            print(f"   📊 Progress: {completed_steps}/{total_steps} steps completed")
+                            print(f"   📍 Current status: {current_status}")
+                        except json.JSONDecodeError:
+                            pass
+
+                    elif tool_name == "pull_results":
+                        # Ensure minimum 30 seconds after submit before first pull
+                        if job_submitted_time is not None:
+                            elapsed = time.time() - job_submitted_time
+                            if elapsed < 30:
+                                wait_time = 30 - elapsed
+                                print(f"   ⏳ Waiting {wait_time:.0f} seconds before first pull...")
+                                time.sleep(wait_time)
+                            job_submitted_time = None  # Only enforce once
+
+                        # Keep polling until job is completed
+                        poll_count = 0
+                        while True:
+                            poll_count += 1
+                            if poll_count > 1:
+                                print(f"\n   🔄 Poll #{poll_count}...")
+
+                            # Execute pull
+                            result = execute_tool(tool_name, tool_input)
+
+                            try:
+                                result_data = json.loads(result)
+                                status = result_data.get("status", "")
+                                clusters_count = len(result_data.get("clusters", []))
+
+                                if "completed" in status.lower():
+                                    print(f"   ✅ Job completed with {clusters_count} clusters")
+                                    break
+                                else:
+                                    print(f"   📊 Got {clusters_count} clusters so far (status: {status})")
+                                    print(f"   ⏳ Job still processing. Waiting 1 minute before next poll...")
+                                    time.sleep(60)
+                            except json.JSONDecodeError:
+                                # If we can't parse, break to avoid infinite loop
+                                break
+                    else:
+                        # Other tools - execute normally
+                        result = execute_tool(tool_name, tool_input)
 
                     # Show truncated result
                     preview = result[:200] + "..." if len(result) > 200 else result
@@ -281,7 +397,7 @@ if __name__ == "__main__":
         print("  export CATCHALL_API_KEY='your_api_key'")
         exit(1)
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    if not ANTHROPIC_API_KEY:
         print("Error: Please set ANTHROPIC_API_KEY environment variable")
         print("  export ANTHROPIC_API_KEY='your_api_key'")
         exit(1)
@@ -294,4 +410,4 @@ if __name__ == "__main__":
     ]
 
     # Run with the first example
-    run_agent(example_queries[0])
+    run_agent(example_queries[1])
