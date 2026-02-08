@@ -1,0 +1,185 @@
+{
+  "job_id": "0b5ead06-535e-4bb0-b25d-aaac2293faef",
+  "query": "Find all M&A deals in pharma industry in the last 7 days",
+  "context": null,
+  "validators": [
+    "is_about_ma_deal",
+    "event_in_timeframe",
+    "involves_pharma_industry"
+  ],
+  "enrichments": [
+    "deal_date",
+    "deal_type",
+    "deal_value",
+    "deal_status",
+    "acquired_company",
+    "acquiring_company",
+    "regulatory_status",
+    "strategic_rationale",
+    "pharmaceutical_focus"
+  ],
+  "status": "Job Completed",
+  "duration": "12m",
+  "candidate_records": 1433,
+  "valid_records": 129,
+  "progress_validated": 1433,
+  "date_range": {
+    "start_date": "2026-01-28T00:00:00Z",
+    "end_date": "2026-02-04T09:08:51Z"
+  },
+  "all_records": [
+    {
+      "record_id": "2868875051127193557",
+      "record_title": "GSK Acquires RAPT Therapeutics to Boost Immunology Pipeline",
+      "enrichment": {
+        "pharmaceutical_focus": "immunology, allergy, food allergies, chronic spontaneous urticaria",
+        "deal_status": "announced",
+        "acquired_company": "RAPT Therapeutics",
+        "deal_date": "2026-01-30",
+        "acquiring_company": "GSK plc",
+        "strategic_rationale": "bolstering immunology portfolio and expanding presence in allergy and immunology treatment space",
+        "deal_type": "acquisition",
+        "regulatory_status": "pending regulatory approvals",
+        "confidence": "high",
+        "deal_value": "$2.2 billion"
+      },
+      "citations": [
+        {
+          "title": "GSK Strengthens Immunology Pipeline with Major Biotech Acquisition",
+          "link": "https://www.ad-hoc-news.de/boerse/news/ueberblick/gsk-strengthens-immunology-pipeline-with-major-biotech-acquisition/68534898",
+          "published_date": "2026-01-30T14:25:04Z"
+        },
+        {
+          "title": "Firms advise on GSK's USD2.2bn RAPT buy, accesses China drug",
+          "link": "https://law.asia/gsk-rapt-therapeutics-acquisition",
+          "published_date": "2026-02-03T01:26:08Z"
+        }
+      ]
+    },
+    {
+      "record_id": "6548786615496341539",
+      "record_title": "BioMarin Pharmaceutical to Acquire Amicus Therapeutics",
+      "enrichment": {
+        "acquired_company": "Amicus Therapeutics",
+        "pharmaceutical_focus": "rare disease treatments, Fabry disease, late-onset Pompe disease, lysosomal diseases",
+        "deal_date": "2026-02-03",
+        "strategic_rationale": "accelerating revenue growth and enhancing earnings per share",
+        "deal_status": "pending",
+        "regulatory_status": "pending regulatory approvals",
+        "deal_type": "acquisition",
+        "deal_value": "$4.8 billion",
+        "acquiring_company": "BioMarin Pharmaceutical",
+        "confidence": "high"
+      },
+      "citations": [
+        {
+          "title": "BioMarin's Amicus Deal Funding Reshapes Debt Load And Rare Disease Reach",
+          "link": "https://finance.yahoo.com/news/biomarin-amicus-deal-funding-reshapes-061052320.html",
+          "published_date": "2026-01-29T06:10:52Z"
+        },
+        {
+          "title": "BioMarin prices $850 million in senior notes to fund Amicus acquisition",
+          "link": "https://www.investing.com/news/company-news/biomarin-prices-850-million-in-senior-notes-to-fund-amicus-acquisition-93CH-4474451",
+          "published_date": "2026-01-29T21:13:09Z"
+        },
+        {
+          "title": "Upcoming Acquisition Resulting in Bullish Stance on BioMarin Pharmaceutical (BMRN)",
+          "link": "https://finance.yahoo.com/news/upcoming-acquisition-resulting-bullish-stance-115719261.html",
+          "published_date": "2026-01-28T11:57:19Z"
+        }
+      ]
+    },
+    {
+      "record_id": "3246179696276957542",
+      "record_title": "AstraZeneca Strikes $4.7 Billion Licensing Deal with CSPC for Weight-Loss Drugs",
+      "enrichment": {
+        "deal_status": "announced",
+        "pharmaceutical_focus": "weight-loss and diabetes drugs, obesity and diabetes drugs",
+        "acquiring_company": "AstraZeneca",
+        "deal_type": "asset purchase",
+        "regulatory_status": "pending regulatory and development milestones",
+        "strategic_rationale": "expand in the fast-growing weight-loss and diabetes market, boost weight-loss drugs pipeline",
+        "deal_date": "2026-01-30",
+        "confidence": "high",
+        "deal_value": "$4.7 billion",
+        "acquired_company": "CSPC Pharmaceuticals"
+      },
+      "citations": [
+        {
+          "title": "AstraZeneca strikes $4.7bn China deal to boost weight-loss drugs pipeline",
+          "link": "https://www.ft.com/content/c919380d-3f08-4dde-98e2-64e50b7da293",
+          "published_date": "2026-01-30T08:58:09Z"
+        },
+        {
+          "title": "AstraZeneca leans into obesity, striking wide-ranging alliance with China's CSPC",
+          "link": "https://finance.yahoo.com/news/astrazeneca-leans-obesity-striking-wide-073600407.html",
+          "published_date": "2026-01-30T07:36:00Z"
+        },
+        {
+          "title": "Astra Signs Obesity Deal With CSPC Worth Up to $18.5 Billion",
+          "link": "https://www.bloomberg.com/news/articles/2026-01-30/astra-signs-obesity-deal-with-cspc-worth-up-to-18-5-billion",
+          "published_date": "2026-01-30T07:30:43Z"
+        }
+      ]
+    },
+    {
+      "record_id": "7774001588360483368",
+      "record_title": "Mirum Pharmaceuticals Completes Acquisition of Bluejay Therapeutics",
+      "enrichment": {
+        "regulatory_status": "FDA breakthrough therapy designation, PRIME designation from the European Medicines Agency",
+        "deal_type": "acquisition",
+        "acquired_company": "Bluejay Therapeutics",
+        "confidence": "high",
+        "pharmaceutical_focus": "rare liver diseases, chronic hepatitis delta virus (HDV)",
+        "deal_value": "$820 million",
+        "strategic_rationale": "portfolio expansion in rare liver diseases, R&D capabilities for chronic hepatitis delta virus (HDV)",
+        "acquiring_company": "Mirum Pharmaceuticals",
+        "deal_date": "2026-01-31",
+        "deal_status": "completed"
+      },
+      "citations": [
+        {
+          "title": "Mirum Pharmaceuticals completes acquisition of Bluejay Therapeutics to advance rare liver disease treatment",
+          "link": "https://www.healthcaremea.com/2026/01/29/mirum-pharmaceuticals-completes-acquisition-of-bluejay-therapeutics-to-advance-rare-liver-disease-treatment",
+          "published_date": "2026-01-29T07:24:38Z"
+        },
+        {
+          "title": "Mirum Pharmaceuticals Expands Rare Liver Portfolio With Bluejay Hepatitis Delta Deal",
+          "link": "https://simplywall.st/stocks/us/pharmaceuticals-biotech/nasdaq-mirm/mirum-pharmaceuticals/news/mirum-pharmaceuticals-expands-rare-liver-portfolio-with-blue",
+          "published_date": "2026-01-31T23:28:57Z"
+        }
+      ]
+    },
+    {
+      "record_id": "7423909693735054402",
+      "record_title": "Torrent Pharmaceuticals Completes Acquisition of Stake in JB Chemicals",
+      "enrichment": {
+        "deal_value": "Rs. 25,689 crore",
+        "pharmaceutical_focus": "chronic and sub-chronic therapies including cardiovascular, gastro-intestinal, central nervous system",
+        "acquiring_company": "Torrent Pharmaceuticals Limited",
+        "deal_date": "2026-02-03",
+        "deal_status": "completed",
+        "acquired_company": "J. B. Chemicals & Pharmaceuticals Limited",
+        "strategic_rationale": "strengthening chronic therapy presence, adding CDMO capabilities",
+        "confidence": "high",
+        "regulatory_status": "Competition Commission of India approved",
+        "deal_type": "acquisition"
+      },
+      "citations": [
+        {
+          "title": "Torrent and JB Chemicals Merger: Key Facts Investors Must Know About the Deal",
+          "link": "https://tradebrains.in/torrent-and-jb-chemicals-merger-key-facts-investors-must-know-about-the-deal",
+          "published_date": "2026-01-31T04:30:00Z"
+        },
+        {
+          "title": "Torrent Pharmaceuticals Completes Acquisition of JB Chemicals Shares, Now Holds 48.80% Stake",
+          "link": "https://scanx.trade/stock-market-news/orders-deals/torrent-pharmaceuticals-completes-acquisition-of-jb-chemicals-shares-now-holds-48-80-stake/31682506",
+          "published_date": "2026-02-03T16:41:46Z"
+        }
+      ]
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total_pages": 26
+}

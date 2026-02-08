@@ -1,0 +1,1377 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "NewsCatcher CatchAll Tool API Gateway",
+    "version": "1.0.0",
+    "description": "\n            The **CatchAll API** is the entrypoint for clients to submit natural language \n            questions and retrieve structured, validated, and clustered news answers.\n            \n            ### Endpoints\n            - **POST /submit**  \n              Create a new job. The system starts fetching and processing articles.  \n              Requires `x-api-key` header. Request body = `{ \"query\": \"...\" }`.\n            \n            - **GET /status/{job_id}**  \n              Returns the latest status of a job (pending, fetching, clustering, done).\n            \n            - **GET /pull/{job_id}**  \n              Fetches final clustered and extracted results for a job from S3.\n            \n            ### Authentication\n            All endpoints require `x-api-key` header. Invalid or missing key → `403 Forbidden`.\n            \n            ### Workflow\n            1. Client calls `/submit` with a query.  \n            2. API stores job in Postgres and publishes a message to RabbitMQ (orchestrator).  \n            3. Jobs proceed through: fetching → validating/extracting → clustering → summarization.  \n            4. Client polls `/status/{job_id}` until job is `done`.  \n            5. Client retrieves results with `/pull/{job_id}`.\n            "
+  },
+  "paths": {
+    "/catchAll/submit": {
+      "post": {
+        "tags": [
+          "CatchAll Jobs"
+        ],
+        "summary": "Submit",
+        "operationId": "submit_catchAll_submit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitRequestDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponseDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catchAll/initialize": {
+      "post": {
+        "tags": [
+          "CatchAll Jobs"
+        ],
+        "summary": "Initialize",
+        "operationId": "initialize_catchAll_initialize_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestInitializeRequestDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestInitializeOutputDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catchAll/status/{job_id}": {
+      "get": {
+        "tags": [
+          "CatchAll Jobs"
+        ],
+        "summary": "Status",
+        "operationId": "status_catchAll_status__job_id__get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            },
+            "name": "job_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponseDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catchAll/pull/{job_id}": {
+      "get": {
+        "tags": [
+          "CatchAll Jobs"
+        ],
+        "summary": "Pull",
+        "operationId": "pull_catchAll_pull__job_id__get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            },
+            "name": "job_id",
+            "in": "path"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "title": "Page",
+              "default": 1
+            },
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "title": "Page Size",
+              "default": 100
+            },
+            "name": "page_size",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullResponseDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catchAll/jobs/user": {
+      "get": {
+        "tags": [
+          "CatchAll Jobs"
+        ],
+        "summary": "Get User Jobs Get",
+        "operationId": "get_user_jobs_get_catchAll_jobs_user_get",
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "title": "Page",
+              "default": 1
+            },
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "title": "Page Size",
+              "default": 100
+            },
+            "name": "page_size",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserJobsResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catchAll/continue": {
+      "post": {
+        "tags": [
+          "CatchAll Jobs"
+        ],
+        "summary": "Continue Job",
+        "operationId": "continue_job_catchAll_continue_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContinueRequestDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContinueResponseDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catchAll/monitors/create": {
+      "post": {
+        "tags": [
+          "CatchAll Monitors"
+        ],
+        "summary": "Create Monitor",
+        "operationId": "create_monitor_catchAll_monitors_create_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMonitorRequestDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateMonitorResponseDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catchAll/monitors/{monitor_id}/jobs": {
+      "get": {
+        "tags": [
+          "CatchAll Monitors"
+        ],
+        "summary": "List Monitor Jobs",
+        "description": "Returns all jobs associated with a monitor, sorted by start_date.\nEach job includes job_id, start_date, and end_date.",
+        "operationId": "list_monitor_jobs_catchAll_monitors__monitor_id__jobs_get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Monitor Id"
+            },
+            "name": "monitor_id",
+            "in": "path"
+          },
+          {
+            "description": "Sort by start_date (asc or desc)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(asc|desc)$",
+              "title": "Sort",
+              "description": "Sort by start_date (asc or desc)",
+              "default": "asc"
+            },
+            "name": "sort",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catchAll/monitors/pull/{monitor_id}": {
+      "get": {
+        "tags": [
+          "CatchAll Monitors"
+        ],
+        "summary": "Pull",
+        "operationId": "pull_catchAll_monitors_pull__monitor_id__get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Monitor Id"
+            },
+            "name": "monitor_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullMonitorResponseDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catchAll/monitors/{monitor_id}/disable": {
+      "post": {
+        "tags": [
+          "CatchAll Monitors"
+        ],
+        "summary": "Disable Monitor",
+        "description": "Disables a monitor. Validates that the provided user key is associated with the monitor.",
+        "operationId": "disable_monitor_catchAll_monitors__monitor_id__disable_post",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Monitor Id"
+            },
+            "name": "monitor_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catchAll/monitors/{monitor_id}/enable": {
+      "post": {
+        "tags": [
+          "CatchAll Monitors"
+        ],
+        "summary": "Enable Monitor",
+        "description": "Enables a monitor. Validates that the provided user key is associated with the monitor.",
+        "operationId": "enable_monitor_catchAll_monitors__monitor_id__enable_post",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Monitor Id"
+            },
+            "name": "monitor_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catchAll/monitors/{monitor_id}": {
+      "patch": {
+        "tags": [
+          "CatchAll Monitors"
+        ],
+        "summary": "Update Monitor",
+        "operationId": "update_monitor_catchAll_monitors__monitor_id__patch",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Monitor Id"
+            },
+            "name": "monitor_id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMonitorRequestDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateMonitorResponseDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catchAll/monitors/": {
+      "get": {
+        "tags": [
+          "CatchAll Monitors"
+        ],
+        "summary": "List Monitors",
+        "operationId": "list_monitors_catchAll_monitors_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListMonitorsByUserOutputDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "PullResponseDTO": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "context": {
+            "type": "string",
+            "title": "Context"
+          },
+          "validators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Validators",
+            "default": []
+          },
+          "enrichments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Enrichments",
+            "default": []
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "duration": {
+            "type": "string",
+            "title": "Duration"
+          },
+          "candidate_records": {
+            "type": "integer",
+            "title": "Candidate Records"
+          },
+          "valid_records": {
+            "type": "integer",
+            "title": "Valid Records"
+          },
+          "progress_validated": {
+            "type": "integer",
+            "title": "Progress Validated"
+          },
+          "date_range": {
+            "type": "object",
+            "title": "Date Range"
+          },
+          "all_records": {
+            "title": "All Records"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Page",
+            "default": 1
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Page Size",
+            "default": 10
+          },
+          "total_pages": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Total Pages",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "status"
+        ],
+        "title": "PullResponseDTO"
+      },
+      "CreateMonitorRequestDTO": {
+        "properties": {
+          "reference_job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reference Job Id",
+            "description": "The job to base this monitor on"
+          },
+          "schedule": {
+            "type": "string",
+            "title": "Schedule",
+            "description": "Natural language schedule (e.g. 'every day at 12 AM EST')"
+          },
+          "webhook": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WebhookDTO"
+              }
+            ],
+            "title": "Webhook",
+            "description": "Webhook configuration with parameters matching requests.request()"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reference_job_id",
+          "schedule"
+        ],
+        "title": "CreateMonitorRequestDTO"
+      },
+      "SuggestInitializeRequestDTO": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "context": {
+            "type": "string",
+            "title": "Context",
+            "description": "context string.",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "SuggestInitializeRequestDTO"
+      },
+      "UserJobsResponseDto": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/UserJob"
+            },
+            "type": "array",
+            "title": "Jobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "page",
+          "page_size",
+          "total_pages",
+          "jobs"
+        ],
+        "title": "UserJobsResponseDto"
+      },
+      "CreateMonitorResponseDTO": {
+        "properties": {
+          "monitor_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Monitor Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "Monitor Created Successfully"
+          }
+        },
+        "type": "object",
+        "title": "CreateMonitorResponseDTO"
+      },
+      "UpdateMonitorResponseDTO": {
+        "properties": {
+          "monitor_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Monitor Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "Monitor updated Successfully"
+          }
+        },
+        "type": "object",
+        "title": "UpdateMonitorResponseDTO"
+      },
+      "PullMonitorResponseDTO": {
+        "properties": {
+          "monitor_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Monitor Id"
+          },
+          "cron_expression": {
+            "type": "string",
+            "title": "Cron Expression"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "reference_job": {
+            "$ref": "#/components/schemas/ReferenceJob"
+          },
+          "run_info": {
+            "type": "object",
+            "title": "Run Info"
+          },
+          "records": {
+            "type": "integer",
+            "title": "Records",
+            "default": 0
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "all_records": {
+            "title": "All Records"
+          }
+        },
+        "type": "object",
+        "required": [
+          "monitor_id",
+          "reference_job",
+          "status"
+        ],
+        "title": "PullMonitorResponseDTO"
+      },
+      "SubmitRequestDTO": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Query"
+          },
+          "schema": {
+            "type": "string",
+            "title": "Schema"
+          },
+          "context": {
+            "type": "string",
+            "title": "Context"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Date"
+          },
+          "validators": {
+            "items": {
+              "$ref": "#/components/schemas/ValidatorSchema"
+            },
+            "type": "array",
+            "title": "Validators"
+          },
+          "enrichments": {
+            "items": {
+              "$ref": "#/components/schemas/EnrichmentSchema"
+            },
+            "type": "array",
+            "title": "Enrichments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "SubmitRequestDTO"
+      },
+      "ContinueRequestDTO": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id",
+            "description": "Existing job id to continue"
+          },
+          "new_limit": {
+            "type": "integer",
+            "title": "New Limit",
+            "description": "Desired new limit greater than previous"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "new_limit"
+        ],
+        "title": "ContinueRequestDTO"
+      },
+      "ListMonitorsByUserOutputDTO": {
+        "properties": {
+          "total_monitors": {
+            "type": "integer",
+            "title": "Total Monitors"
+          },
+          "monitors": {
+            "items": {
+              "$ref": "#/components/schemas/MonitorListItemDTO"
+            },
+            "type": "array",
+            "title": "Monitors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_monitors",
+          "monitors"
+        ],
+        "title": "ListMonitorsByUserOutputDTO"
+      },
+      "ContinueResponseDTO": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "previous_limit": {
+            "type": "integer",
+            "title": "Previous Limit"
+          },
+          "new_limit": {
+            "type": "integer",
+            "title": "New Limit"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "accepted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "new_limit"
+        ],
+        "title": "ContinueResponseDTO"
+      },
+      "SuggestInitializeOutputDTO": {
+        "properties": {
+          "validators": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Validators"
+          },
+          "enrichments": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Enrichments"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Date"
+          },
+          "date_modification_message": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Date Modification Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "validators",
+          "enrichments"
+        ],
+        "title": "SuggestInitializeOutputDTO"
+      },
+      "SubmitResponseDTO": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id"
+        ],
+        "title": "SubmitResponseDTO"
+      },
+      "UpdateMonitorRequestDTO": {
+        "properties": {
+          "webhook": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WebhookDTO"
+              }
+            ],
+            "title": "Webhook",
+            "description": "Webhook configuration with parameters matching requests.request()"
+          }
+        },
+        "type": "object",
+        "title": "UpdateMonitorRequestDTO"
+      },
+      "StatusResponseDTO": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/src__application__usecases__jobs__status__dto__JobStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id"
+        ],
+        "title": "StatusResponseDTO"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WebhookDTO": {
+        "properties": {
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "maxLength": 2083,
+                "minLength": 1,
+                "format": "uri"
+              }
+            ],
+            "title": "Url",
+            "description": "The URL where the request will be sent"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "POST",
+              "PUT"
+            ],
+            "title": "Method",
+            "description": "HTTP method to use (POST or PUT)",
+            "default": "POST"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Headers",
+            "description": "HTTP headers to send with the request"
+          },
+          "params": {
+            "type": "object",
+            "title": "Params",
+            "description": "Query string parameters"
+          },
+          "auth": {
+            "items": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Auth",
+            "description": "Basic auth tuple (username, password)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "WebhookDTO",
+        "description": "Webhook configuration matching requests.request() signature.\nAll parameters are optional except url for flexibility."
+      },
+      "UserJob": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "user_key": {
+            "type": "string",
+            "title": "User Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "query",
+          "created_at",
+          "status",
+          "user_key"
+        ],
+        "title": "UserJob"
+      },
+      "ReferenceJob": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "context": {
+            "type": "string",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "title": "ReferenceJob"
+      },
+      "EnrichmentSchema": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Enrichment field name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "What information this extracts"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnrichmentType"
+              }
+            ],
+            "description": "Data type for this enrichment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "type"
+        ],
+        "title": "EnrichmentSchema",
+        "description": "Schema for a single enrichment field"
+      },
+      "ValidatorSchema": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Validator field name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "What this validator checks"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "boolean"
+            ],
+            "title": "Type",
+            "description": "Validator type",
+            "default": "boolean"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "ValidatorSchema",
+        "description": "Schema for a single validator"
+      },
+      "MonitorListItemDTO": {
+        "properties": {
+          "monitor_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Monitor Id"
+          },
+          "reference_job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reference Job Id"
+          },
+          "reference_job_query": {
+            "type": "string",
+            "title": "Reference Job Query"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "schedule": {
+            "type": "string",
+            "title": "Schedule"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "webhook": {
+            "$ref": "#/components/schemas/WebhookDTO"
+          },
+          "schedule_human_readable": {
+            "type": "string",
+            "title": "Schedule Human Readable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "monitor_id",
+          "reference_job_id",
+          "reference_job_query",
+          "enabled"
+        ],
+        "title": "MonitorListItemDTO"
+      },
+      "src__application__usecases__jobs__status__dto__JobStep": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order"
+          },
+          "completed": {
+            "type": "boolean",
+            "title": "Completed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "order"
+        ],
+        "title": "JobStep"
+      },
+      "EnrichmentType": {
+        "type": "string",
+        "enum": [
+          "text",
+          "number",
+          "date",
+          "option",
+          "url",
+          "company"
+        ],
+        "title": "EnrichmentType",
+        "description": "Canonical enrichment types supported by the system."
+      }
+    },
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ]
+}
