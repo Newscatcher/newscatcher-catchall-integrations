@@ -1,11 +1,15 @@
 ---
 name: catchall
 description: >
-  Search, monitor, and analyze web data using the NewsCatcher CatchAll API.
-  Use when the user wants to conduct a web search by natural language query,
-  track job status, retrieve clustered and summarized results, set up
-  recurring monitors with webhooks, or manage existing monitors.
-  Handles job submission, polling, pagination, continuation, and monitor CRUD.
+    Extract structured, validated data from thousands of web sources at scale.
+  Unlike standard web search which returns a handful of links, this skill finds
+  all matching content across the web, deduplicates and clusters it, validates
+  relevance, and extracts custom fields (companies, dates, amounts, categories)
+  into structured records. Use when the user needs comprehensive data collection
+  — such as tracking M&A deals, funding rounds, product launches, regulatory
+  changes, or any event where they need every occurrence, not just the top
+  results. Also supports recurring monitors with webhook delivery for ongoing
+  tracking.
 license: MIT
 compatibility: Requires network access to https://catchall.newscatcherapi.com. Requires a valid X-API-Key. Get API key at https://platform.newscatcherapi.com
 metadata:
@@ -52,8 +56,11 @@ Minimal (recommended for most cases):
 ```json
 { "query": "Find all M&A deals in the tech sector last 7 days" }
 ```
+The system automatically selects appropriate validators, enrichments, and date
+ranges based on the query. **This is the preferred path** — the auto-selected
+parameters are good defaults for most queries.
 
-Full control (when you know exactly what you want):
+Custom overrides (only when the user explicitly requests specific filters or fields):
 
 ```json
 {
@@ -63,7 +70,9 @@ Full control (when you know exactly what you want):
   "start_date": "2026-01-30T00:00:00Z",
   "end_date": "2026-02-07T00:00:00Z",
   "validators": [
-    { "name": "is_merger", "description": "Article is about a merger or acquisition", "type": "boolean" }
+       { "name": "is_ma_deal", "description": "True if the article reports on a specific merger or acquisition deal between two named companies, not general M&A commentary", "type": "boolean" },
+    { "name": "is_event_in_last_7_days", "description": "True if the deal was announced or closed within the last 7 days", "type": "boolean" },
+    { "name": "involves_tech", "description": "True if at least one party is a technology company", "type": "boolean" }
   ],
   "enrichments": [
     { "name": "deal_value", "description": "Estimated deal value in USD", "type": "number" },
@@ -71,6 +80,16 @@ Full control (when you know exactly what you want):
   ]
 }
 ```
+
+> **When to use custom validators/enrichments**: Only provide these when the user gives explicit instructions about filtering or data extraction — e.g. "make sure  to filter out deals under $10M" or "I also need the acquirer's country." If the  user just describes what they're looking for without specifying filters, submit  with only the query and let the system choose.
+
+**If you do provide custom validators, use multiple.** Each validator acts as a
+filter — an article must pass *all* of them to count as a valid record. Since you
+pay per valid record, using 3–5 specific validators is the best way to keep results
+relevant and costs under control. A single broad validator will let too much noise
+through. Break the user's filtering instructions into separate validation checks:
+event type, timeframe, industry, geography, significance, etc.
+See `references/VALIDATORS.md` for detailed guidance.
 
 Returns `{ "job_id": "<uuid>" }`.
 
@@ -165,6 +184,34 @@ Returns clustered, validated, and enriched articles:
 | `page` / `page_size` / `total_pages` | Pagination info |
 | `duration` | Processing time |
 | `date_range` | Date window of results |
+
+## CRITICAL: Result Presentation
+
+When presenting results to the user (regardless of interface - script, Claude Desktop, claude.ai):
+
+**ALWAYS show the EXACT number of results returned by the API:**
+- If API returns 10 records → show ALL 10
+- If API returns 15 records → show ALL 15  
+- If API returns 50 records → show ALL 50
+- NEVER skip any records
+
+**By default, For EACH record, display:**
+- `record_title` (full title, not truncated)
+- Key enrichment data (deal_value, company_name, etc.)
+- At least 1 citation link with title
+If a user asked to display in a custom way, obey.
+
+**WHY this matters:**
+The user set a specific limit for a reason - they want to see that EXACT number of results.
+Reducing 15→12 or 20→15 breaks user expectations and wastes API quota.
+
+**Example:**
+```
+User requested limit=15
+API returned 15 records
+You MUST show all 15 with titles, not "here are 12 highlights"
+```
+
 
 ### Step 4 — Continue a job (optional)
 
