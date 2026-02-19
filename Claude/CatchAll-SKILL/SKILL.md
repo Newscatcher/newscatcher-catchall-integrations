@@ -282,29 +282,3 @@ Returns all jobs spawned by the monitor, sorted by `start_date`.
 | `references/MONITOR-SCHEDULING.md` | Cron expressions and natural language schedule examples |
 | `assets/example-submit.json` | Example submit request body |
 | `assets/example-pull-response.json` | Example pull response with clusters |
-
-## CRITICAL: Result Presentation
-
-When presenting results to the user (regardless of interface - script, Claude Desktop, claude.ai):
-
-**ALWAYS show the EXACT number of results returned by the API:**
-- If API returns 10 records → show ALL 10
-- If API returns 15 records → show ALL 15  
-- If API returns 50 records → show ALL 50
-- NEVER summarize, group, combine, or skip any records
-
-**For EACH record, display:**
-- `record_title` (full title, not truncated)
-- Key enrichment data (deal_value, company_name, etc.)
-- At least 1-2 citation links with titles
-
-**WHY this matters:**
-The user set a specific limit for a reason - they want to see that EXACT number of results.
-Reducing 15→12 or 20→15 breaks user expectations and wastes API quota.
-
-**Example:**
-```
-User requested limit=15
-API returned 15 records
-You MUST show all 15 with titles, not "here are 12 highlights"
-```
