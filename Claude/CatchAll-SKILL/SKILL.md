@@ -1,7 +1,7 @@
 ---
 name: catchall
 description: >
-    Extract structured, validated data from thousands of web sources at scale.
+  Extract structured, validated data from thousands of web sources at scale.
   Unlike standard web search which returns a handful of links, this skill finds
   all matching content across the web, deduplicates and clusters it, validates
   relevance, and extracts custom fields (companies, dates, amounts, categories)
