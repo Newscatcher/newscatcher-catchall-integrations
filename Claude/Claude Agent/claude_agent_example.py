@@ -58,12 +58,12 @@ TOOLS = [
     {
         "name": "submit_query",
         "description": (
-            "Submit a natural language query to search for news articles. "
+            "Submit a natural language query to search the web. "
             "The system will fetch, validate, cluster, and summarize relevant articles. "
             "Returns a job_id. After submitting, wait 30 seconds before calling pull_results "
             "for the first time - results stream in gradually as processing continues. "
             "By default, limits results to 10 clusters. Set fetch_all=true only if the user "
-            "explicitly asks for ALL results (e.g., 'find all news', 'get everything')."
+            "explicitly asks for ALL results (e.g., 'find all', 'get everything')."
         ),
         "input_schema": {
             "type": "object",
@@ -88,7 +88,7 @@ TOOLS = [
             "Results appear gradually as processing continues. The response includes 'status' field - "
             "if not 'completed', more results may be available later. Poll every 1 minute to get new results. "
             "When you get results but status is not 'completed', show the user what's available so far "
-            "and let them know more results are coming. Returns clustered and summarized news articles."
+            "and let them know more results are coming. Returns clustered and summarized results."
         ),
         "input_schema": {
             "type": "object",
@@ -404,8 +404,8 @@ if __name__ == "__main__":
 
     # Example queries to try:
     example_queries = [
-        "Find recent news about AI startup funding rounds in the last 7 days",
-        "Search for news about electric vehicle companies in Europe",
+        "Find recent AI startup funding rounds in the last 7 days",
+        "Search for anything new about electric vehicle companies in Europe",
         "What are the latest developments in quantum computing?",
     ]
 
