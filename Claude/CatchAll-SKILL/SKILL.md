@@ -295,7 +295,6 @@ When presenting results to the user (regardless of interface - script, Claude De
 
 **For EACH record, display:**
 - `record_title` (full title, not truncated)
-- `record_id` (for reference)
 - Key enrichment data (deal_value, company_name, etc.)
 - At least 1-2 citation links with titles
 
