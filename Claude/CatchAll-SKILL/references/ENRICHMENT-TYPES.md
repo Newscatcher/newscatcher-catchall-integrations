@@ -28,21 +28,18 @@ The `description` field is critical — it tells the AI what to extract. Good
 descriptions are specific and unambiguous.
 
 **Good descriptions:**
-
 - `"Estimated total deal value in USD, including cash and stock components"`
 - `"Name of the company being acquired or merged"`
 - `"Current regulatory approval status (e.g. pending, approved, blocked)"`
 
 **Poor descriptions:**
-
-- `"Value"` — too vague, could mean anything
-- `"Company"` — which company? There are always at least two in M&A
+- `"Value"` — too vague
+- `"Company"` — which company?
 - `"Status"` — status of what?
 
 ## Real-world enrichment sets
 
 ### M&A tracking
-
 ```json
 [
   { "name": "acquiring_company", "description": "Name of the acquiring company", "type": "company" },
@@ -57,7 +54,6 @@ descriptions are specific and unambiguous.
 ```
 
 ### Funding rounds
-
 ```json
 [
   { "name": "company_name", "description": "Name of the company that raised funding", "type": "company" },
@@ -70,7 +66,6 @@ descriptions are specific and unambiguous.
 ```
 
 ### Product launches
-
 ```json
 [
   { "name": "company_name", "description": "Company launching the product", "type": "company" },
@@ -84,5 +79,4 @@ descriptions are specific and unambiguous.
 ## Confidence field
 
 Every enrichment result includes an automatic `confidence` field (`"high"`,
-`"medium"`, or `"low"`) indicating how reliably the value was extracted from the
-source articles. This is not something you define — the system adds it.
+`"medium"`, or `"low"`) indicating extraction reliability. You don't define this — the system adds it.
