@@ -1,5 +1,5 @@
 ---
-name: catchall-mergers-and-acquisitions
+name: mergers-and-acquisitions-catchall
 description: Invoke this skill for any query about company mergers, acquisitions,
  asset purchases, acqui-hires, or merger announcements. Triggers on queries
  like "AI companies acquired in the US last 30 days", "which fintech startups were acquired this month", "mergers announced in Europe last 2 weeks". Works for any geography, any event type, and any industry vertical. This is an event-based skill reusable across GTM, VC, competitive intelligence, and
