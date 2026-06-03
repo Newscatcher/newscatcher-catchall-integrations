@@ -1,5 +1,5 @@
 [project]
-name = "risk_managment_agent"
+name = "risk_management_agent"
 version = "1.0.0"
 description = "Automotive Supply Chain Risk Management System using CrewAI"
 authors = [{ name = "Your Name", email = "you@example.com" }]
@@ -20,7 +20,7 @@ dev = [
 ]
 
 [project.scripts]
-run_crew = "risk_managment_agent.main:run"
+run_crew = "risk_management_agent.main:run"
 
 [build-system]
 requires = ["hatchling"]
@@ -30,4 +30,4 @@ build-backend = "hatchling.build"
 type = "crew"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/risk_managment_agent"]
+packages = ["src/risk_management_agent"]

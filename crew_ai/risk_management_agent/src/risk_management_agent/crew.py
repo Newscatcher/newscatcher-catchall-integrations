@@ -8,11 +8,11 @@ from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 
-from risk_managment_agent.tools.newscatcher_risk_tool import NewscatcherDirectResultTool
+from risk_management_agent.tools.newscatcher_risk_tool import NewscatcherDirectResultTool
 
 
 @CrewBase
-class RiskManagmentAgent:
+class RiskManagementAgent:
     """3-stage risk management pipeline for EU automotive OEMs."""
 
     agents: List[BaseAgent]

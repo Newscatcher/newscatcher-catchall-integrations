@@ -29,22 +29,22 @@ crewai run
 ### CLI Mode
 ```bash
 # Fetch from monitor
-python -m risk_managment_agent.main monitor <monitor_id>
+python -m risk_management_agent.main monitor <monitor_id>
 
 # Fetch from existing job
-python -m risk_managment_agent.main job <job_id>
+python -m risk_management_agent.main job <job_id>
 
 # Create new job
-python -m risk_managment_agent.main new
+python -m risk_management_agent.main new
 ```
 
 ### Examples
 ```bash
 # From monitor
-python -m risk_managment_agent.main monitor <monitor_id>
+python -m risk_management_agent.main monitor <monitor_id>
 
 # From job
-python -m risk_managment_agent.main job <job_id>
+python -m risk_management_agent.main job <job_id>
 ```
 
 ## Pipeline
