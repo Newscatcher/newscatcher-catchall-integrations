@@ -17,11 +17,11 @@ Core workflow:
 
 ---
 
-## Skills (Claude Code)
+## Skills
 
-Skills are SKILL.md files that give Claude Code a specialized, task-specific capability on top of the CatchAll API. Each skill knows how to write the right query, which validators to apply, and how to format the output for its specific use case.
+Skills are SKILL.md files that give Claude or any other Agent a specialized, task-specific capability on top of the CatchAll API or CatchAll MCP. Each skill knows how to write the right query, which validators to apply, and how to format the output for its specific use case.
 
-To install a skill, copy its folder into your project's `.claude/skills/` directory or point Claude Code at it directly.
+To install a skill with Claude, copy its folder into your project's `.claude/skills/` directory or point Claude at it directly. Same goes with other Agents. You might require to create a .zip file reuniting multiple skill related files together.
 
 ### Available Skills
 
@@ -41,7 +41,7 @@ To install a skill, copy its folder into your project's `.claude/skills/` direct
 ### General Use Case
 **Folder:** `skills/general-use-case`
 
-The foundational CatchAll skill. Gives Claude the full API surface: submit queries with optional validators and enrichments, poll job status, pull structured and clustered results, paginate with `/continue`, and set up recurring monitors with webhook delivery.
+The foundational CatchAll skill. Gives Agnets the full API surface: submit queries with optional validators and enrichments, poll job status, pull structured and clustered results, paginate with `/continue`, and set up recurring monitors with webhook delivery.
 
 Use this skill when the user needs comprehensive web data extraction for a use case not covered by a dedicated skill — or when they want direct control over validators, enrichment types, and scheduling.
 
