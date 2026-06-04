@@ -17,6 +17,19 @@ Core workflow:
 
 ---
 
+## Accessing CatchAll
+
+CatchAll exposes two interfaces. Both require an API key from [platform.newscatcherapi.com](https://platform.newscatcherapi.com).
+
+| Interface | URL | Docs | Best for |
+|---|---|---|---|
+| **REST API** | `https://catchall.newscatcherapi.com` | [API docs](https://www.newscatcherapi.com/docs/web-search-api/get-started/introduction) | Direct integration, full parameter control, framework-based agents |
+| **MCP Server** | `https://catchall-mcp.newscatcherapi.com/mcp?apiKey=YOUR_API_KEY` | [MCP docs](https://www.newscatcherapi.com/docs/web-search-api/integrations/mcp) | Agent skills — provides a simplified, tool-oriented interface |
+
+The MCP server calls the REST API under the hood. The API is the source of truth; MCP is a convenience layer that reduces boilerplate for agent skills.
+
+---
+
 ## Skills
 
 Skills are SKILL.md files that give Claude or any other Agent a specialized, task-specific capability on top of the CatchAll API or CatchAll MCP. Each skill knows how to write the right query, which validators to apply, and how to format the output for its specific use case.
@@ -25,12 +38,12 @@ To install a skill with Claude, copy its folder into your project's `.claude/ski
 
 ### Available Skills
 
-| Skill | Use Case | Trigger Phrases | Folder |
-|---|---|---|---|
-| General Use Case | General-purpose CatchAll access: submit queries, poll jobs, pull results, set up monitors | Any CatchAll API task without a dedicated skill | [`skills/general-use-case`](./skills/general-use-case/) |
-| Competitor Snapshot | Structured digest of a competitor's recent moves: product launches, pricing, leadership, M&A, partnerships | "Snapshot [company]", "what's [competitor] been up to", "competitive brief on [company]" | [`skills/competitor-snapshot`](./skills/competitor-snapshot/) |
-| Fundraising | Confirmed funding announcements across any geography, stage, and industry | "Series B raises in Austin last 30 days", "AI startups that raised seed this month" | [`skills/fundraising`](./skills/fundraising/) |
-| Mergers & Acquisitions | Confirmed M&A deals — acquisitions, mergers, asset purchases, acqui-hires | "AI companies acquired in the US last 30 days", "fintech mergers this week" | [`skills/mergers-and-acquisitions`](./skills/mergers-and-acquisitions/) |
+| Skill | Use Case | Trigger Phrases | Interface | Folder |
+|---|---|---|---|---|
+| General Use Case | General-purpose CatchAll access: submit queries, poll jobs, pull results, set up monitors | Any CatchAll API task without a dedicated skill | API | [`skills/general-use-case`](./skills/general-use-case/) |
+| Competitor Snapshot | Structured digest of a competitor's recent moves: product launches, pricing, leadership, M&A, partnerships | "Snapshot [company]", "what's [competitor] been up to", "competitive brief on [company]" | MCP + API fallback | [`skills/competitor-snapshot`](./skills/competitor-snapshot/) |
+| Fundraising | Confirmed funding announcements across any geography, stage, and industry | "Series B raises in Austin last 30 days", "AI startups that raised seed this month" | MCP | [`skills/fundraising`](./skills/fundraising/) |
+| Mergers & Acquisitions | Confirmed M&A deals — acquisitions, mergers, asset purchases, acqui-hires | "AI companies acquired in the US last 30 days", "fintech mergers this week" | MCP | [`skills/mergers-and-acquisitions`](./skills/mergers-and-acquisitions/) |
 
 > **For any contributor:** add a row to the table above each time a new skill is merged. Fill in all four columns. Keep the folder path relative so links stay valid after cloning.
 
@@ -39,9 +52,9 @@ To install a skill with Claude, copy its folder into your project's `.claude/ski
 ## Skill Descriptions
 
 ### General Use Case
-**Folder:** `skills/general-use-case`
+**Folder:** `skills/general-use-case` · **Interface:** REST API (`https://catchall.newscatcherapi.com`)
 
-The foundational CatchAll skill. Gives Agnets the full API surface: submit queries with optional validators and enrichments, poll job status, pull structured and clustered results, paginate with `/continue`, and set up recurring monitors with webhook delivery.
+The foundational CatchAll skill. Gives agents the full API surface: submit queries with optional validators and enrichments, poll job status, pull structured and clustered results, paginate with `/continue`, and set up recurring monitors with webhook delivery.
 
 Use this skill when the user needs comprehensive web data extraction for a use case not covered by a dedicated skill — or when they want direct control over validators, enrichment types, and scheduling.
 
@@ -50,7 +63,7 @@ Use this skill when the user needs comprehensive web data extraction for a use c
 ---
 
 ### Competitor Snapshot
-**Folder:** `skills/competitor-snapshot`
+**Folder:** `skills/competitor-snapshot` · **Interface:** MCP (`https://catchall-mcp.newscatcherapi.com/mcp`) — falls back to REST API if MCP is unavailable
 
 Produces a structured digest of a competitor's recent moves across the categories that competitive intelligence teams, product strategists, and sales enablement actually use: product launches, pricing changes, leadership moves, customer wins, partnerships, M&A activity, and financial signals.
 
@@ -63,7 +76,7 @@ Best for: CI analysts, product managers, sales enablement, founders doing market
 ---
 
 ### Fundraising
-**Folder:** `skills/fundraising`
+**Folder:** `skills/fundraising` · **Interface:** MCP (`https://catchall-mcp.newscatcherapi.com/mcp`)
 
 Finds confirmed funding announcements — pre-seed through Series C and beyond — across any geography, funding stage, and industry vertical. Returns structured event records extracted from web sources, not raw article links.
 
@@ -76,7 +89,7 @@ Best for: VCs tracking deal flow, GTM teams building prospect lists, analysts mo
 ---
 
 ### Mergers & Acquisitions
-**Folder:** `skills/mergers-and-acquisitions`
+**Folder:** `skills/mergers-and-acquisitions` · **Interface:** MCP (`https://catchall-mcp.newscatcherapi.com/mcp`)
 
 Finds confirmed M&A deals — acquisitions, mergers, asset purchases, and acqui-hires — across any geography and industry. Returns structured event records with deal type, parties involved, deal value (where disclosed), and deal status.
 
