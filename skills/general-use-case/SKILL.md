@@ -1,18 +1,20 @@
 ---
 name: general-use-case-catchall
 description: >
-  Extract structured, validated data from thousands of web sources at scale.
-  Unlike standard web search which returns a handful of links, this skill finds
-  all matching content across the web, deduplicates and clusters it, validates
-  relevance, and extracts custom fields (companies, dates, amounts, categories)
-  into structured records. Use when the user needs comprehensive data collection
-  — such as tracking M&A deals, funding rounds, product launches, regulatory
-  changes, or any event where they need every occurrence, not just the top
-  results. Also supports recurring monitors, webhook delivery, entity watchlists,
-  and project-based organization. Prefer a dedicated use-case skill
-  (fundraising-catchall, mergers-and-acquisitions-catchall,
-  competitor-snapshot-catchall) when one matches — use this skill for everything
-  else.
+  Use this skill whenever the user wants to search for events or facts across
+  the web, set up a recurring monitor, configure a webhook, build a watchlist
+  of companies or people, or organize work into projects — even if they don't
+  say "CatchAll" explicitly. Triggers on phrases like "find all X in the last
+  N days", "monitor this query weekly", "alert me when Y happens", "track these
+  companies", "set up a Slack notification for Z", "how many credits do I have
+  left", or any request to manage past jobs or monitors. Extracts structured,
+  validated data from thousands of web sources — deduplicates, clusters,
+  validates relevance, and extracts custom fields into structured records. Covers
+  the full CatchAll platform surface: jobs, monitors, webhooks, datasets,
+  entities, and projects. Use dedicated skills (fundraising-catchall,
+  mergers-and-acquisitions-catchall, competitor-snapshot-catchall) for those
+  specific event types when the user's intent clearly matches — but when in
+  doubt, use this skill.
 license: MIT
 compatibility: Requires the CatchAll MCP server at https://catchall-mcp.newscatcherapi.com/mcp. Requires a valid CatchAll API key. Get one at https://platform.newscatcherapi.com
 metadata:
@@ -38,9 +40,11 @@ Before constructing any query, run this self-check:
 - `press coverage`, `media coverage`, `recent news`
 - `find articles`, `search articles`, `get articles`, `coverage of`
 
-If yes — **stop and rewrite**. CatchAll extracts events and facts from web
-sources. The query must describe what happened in the world, not what was
-written about it.
+If yes — **stop and rewrite**. CatchAll's pipeline interprets the query as a
+description of a real-world event to find. A journalism-style query ("articles
+about X") confuses its intent classifier, which then retrieves coverage of a
+topic rather than occurrences of an event — producing off-target or empty
+results even when the underlying events clearly exist in the index.
 
 **Wrong:** `"news articles about AI regulation in the EU last 30 days"`
 **Right:** `"AI regulation measures announced or enacted in the EU in the last 30 days"`
@@ -282,6 +286,20 @@ to named entities in the list.
 3. Wait for dataset status to reach `ready` — entities are enriched before first use
 4. Pass `connected_dataset_ids: [<dataset_id>]` in `submit_query`
 
+**`ed_score_min` — entity confidence threshold:**
+
+When using a dataset, each result is scored against how confidently it matches
+an entity in the list (`ed_score` 0–10). Pass `ed_score_min` in `submit_query`
+to filter out weak matches:
+
+| Value | Effect |
+|---|---|
+| `8` (recommended) | High-confidence matches only — fewer results, less noise |
+| `5` | Moderate — captures more results but may include tangential mentions |
+| omit | No threshold — returns everything, including weak associations |
+
+Start at `8`. If the user reports too few results, lower to `5`.
+
 **When to use watchlist mode:**
 
 - "Track these 10 competitors" — named company list
@@ -345,6 +363,33 @@ Projects group related jobs, monitors, and datasets together. Use them when:
 Projects are organizational only — they don't affect job processing or billing.
 Deleting a project with `delete_resources: false` (the default) leaves all
 resources intact.
+
+---
+
+## Full automation workflow
+
+The most common multi-step request — "alert me every week when X happens" —
+requires wiring together jobs, monitors, and webhooks. Here is the complete
+sequence:
+
+1. **Submit a job** — `submit_query` with the user's query. Use a short window
+   (last 7 days) to test that the query returns meaningful results.
+2. **Review output with the user** — pull results, confirm the records are
+   relevant. Refine query, validators, or enrichments if needed. Repeat until
+   the user is satisfied.
+3. **Create a webhook** — `create_webhook` with the delivery destination
+   (Slack, Teams, or a generic URL). Run `test_webhook` to confirm it receives
+   payloads before wiring it up.
+4. **Create a monitor** — `create_monitor` using the completed job as
+   `reference_job_id`, with the user's requested schedule and the webhook's
+   `id` passed in `webhook_ids`.
+5. **Confirm** — tell the user: what query will run, on what schedule, where
+   results will be delivered.
+
+This five-step sequence is the answer to prompts like:
+- "Send me a Slack message every Monday with new fintech partnerships"
+- "Alert me daily if any of our competitors raises funding"
+- "Set up a weekly digest of EU regulatory actions to my email webhook"
 
 ---
 
@@ -419,6 +464,7 @@ Always explain what changed before resubmitting.
 | User asks for data beyond 30 days | Split into consecutive 30-day windows; run each as a separate job |
 | Dataset status not `ready` | Wait for enrichment to complete before attaching to a job |
 | Dataset `health_score` is low | Some entities failed enrichment — check `list_dataset_entities` for `status: failed` |
+| Monitor returning 0 results after previously returning N | Run `get_monitor_status` to see state history; check if the reference job's validators have become too strict for the current news cycle — resubmit the reference job and create a new monitor if needed |
 | Monitor webhook fails | Use `get_webhook_history` to diagnose; `update_monitor` or `update_webhook` to fix |
 | User wants to re-pull a past job | `list_user_jobs` to find the `job_id`, then `pull_results` |
 | User wants to share work with a teammate | Add resources to a project; teammates with access can filter by project |
