@@ -4,7 +4,7 @@ All notable changes to this repository are documented here.
 
 ---
 
-## [Unreleased] — 2026-06-05
+## [2026-06-05]
 
 ### Skills — `general-use-case`
 - Applied skill-creator (Anthropic public skill) analysis to `skills/general-use-case/SKILL.md`
