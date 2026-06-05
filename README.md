@@ -40,7 +40,7 @@ To install a skill with Claude, copy its folder into your project's `.claude/ski
 
 | Skill | Use Case | Trigger Phrases | Interface | Folder |
 |---|---|---|---|---|
-| General Use Case | General-purpose CatchAll access: submit queries, poll jobs, pull results, set up monitors | Any CatchAll API task without a dedicated skill | API | [`skills/general-use-case`](./skills/general-use-case/) |
+| General Use Case | General-purpose CatchAll access: submit queries, poll jobs, pull results, monitors, webhooks, datasets, entities, projects | Any CatchAll task without a dedicated skill | MCP | [`skills/general-use-case`](./skills/general-use-case/) |
 | Competitor Snapshot | Structured digest of a competitor's recent moves: product launches, pricing, leadership, M&A, partnerships | "Snapshot [company]", "what's [competitor] been up to", "competitive brief on [company]" | MCP + API fallback | [`skills/competitor-snapshot`](./skills/competitor-snapshot/) |
 | Fundraising | Confirmed funding announcements across any geography, stage, and industry | "Series B raises in Austin last 30 days", "AI startups that raised seed this month" | MCP | [`skills/fundraising`](./skills/fundraising/) |
 | Mergers & Acquisitions | Confirmed M&A deals — acquisitions, mergers, asset purchases, acqui-hires | "AI companies acquired in the US last 30 days", "fintech mergers this week" | MCP | [`skills/mergers-and-acquisitions`](./skills/mergers-and-acquisitions/) |
@@ -52,11 +52,9 @@ To install a skill with Claude, copy its folder into your project's `.claude/ski
 ## Skill Descriptions
 
 ### General Use Case
-**Folder:** `skills/general-use-case` · **Interface:** REST API (`https://catchall.newscatcherapi.com`)
+**Folder:** `skills/general-use-case` · **Interface:** MCP (`https://catchall-mcp.newscatcherapi.com/mcp`)
 
-The foundational CatchAll skill. Gives agents the full API surface: submit queries with optional validators and enrichments, poll job status, pull structured and clustered results, paginate with `/continue`, and set up recurring monitors with webhook delivery.
-
-Use this skill when the user needs comprehensive web data extraction for a use case not covered by a dedicated skill — or when they want direct control over validators, enrichment types, and scheduling.
+The foundational CatchAll skill. Covers the full platform surface via MCP: jobs, monitors, webhooks, datasets, entities, and projects. Use it for any CatchAll task not covered by a dedicated use-case skill — or when the user needs direct control over validators, enrichments, watchlists, or delivery setup.
 
 → [Read the skill documentation](./skills/general-use-case/SKILL.md)
 

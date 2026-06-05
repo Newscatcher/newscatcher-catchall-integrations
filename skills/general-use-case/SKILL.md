@@ -8,324 +8,417 @@ description: >
   into structured records. Use when the user needs comprehensive data collection
   — such as tracking M&A deals, funding rounds, product launches, regulatory
   changes, or any event where they need every occurrence, not just the top
-  results. Also supports recurring monitors with webhook delivery for ongoing
-  tracking.
+  results. Also supports recurring monitors, webhook delivery, entity watchlists,
+  and project-based organization. Prefer a dedicated use-case skill
+  (fundraising-catchall, mergers-and-acquisitions-catchall,
+  competitor-snapshot-catchall) when one matches — use this skill for everything
+  else.
 license: MIT
-compatibility: Requires network access to https://catchall.newscatcherapi.com. Requires a valid X-API-Key. Get API key at https://platform.newscatcherapi.com
+compatibility: Requires the CatchAll MCP server at https://catchall-mcp.newscatcherapi.com/mcp. Requires a valid CatchAll API key. Get one at https://platform.newscatcherapi.com
 metadata:
   author: newscatcher
-  version: "1.0"
-  openapi-version: "3.0"
-  base-url: https://catchall.newscatcherapi.com
+  version: "2.0"
 ---
 
-# CatchAll Web Search Intelligence Skill
+This skill covers the full CatchAll surface: how to write queries that produce
+results, which tool to call for each task, and how to use the platform's
+organizational features (webhooks, datasets, entities, projects). The MCP
+server handles authentication, routing, and response schemas — this skill
+handles judgment.
 
-## When to activate
+---
 
-Activate this skill when the user wants to:
+## CRITICAL: Never query for web pages
 
-- Search for web data using a natural language query
-- Check the status of a processing job
-- Retrieve clustered, validated, and enriched results in a structured dataset
-- Continue a job to fetch more records beyond the initial limit
-- Create, update, enable, disable, or list recurring event monitors
-- Set up webhook delivery for monitored queries
+Before constructing any query, run this self-check:
 
-## Authentication
+**Does my query contain any of these forbidden phrases?**
 
-All endpoints require an `X-API-Key` header. If the key is missing or invalid, the API returns `403 Forbidden`.
+- `news articles`, `news stories`, `articles about`, `stories about`
+- `press coverage`, `media coverage`, `recent news`
+- `find articles`, `search articles`, `get articles`, `coverage of`
 
-```
-X-API-Key: <user-api-key>
-```
+If yes — **stop and rewrite**. CatchAll extracts events and facts from web
+sources. The query must describe what happened in the world, not what was
+written about it.
 
-## Core workflow: Jobs
+**Wrong:** `"news articles about AI regulation in the EU last 30 days"`
+**Right:** `"AI regulation measures announced or enacted in the EU in the last 30 days"`
 
-The primary flow is **submit → poll → pull**.
+**Wrong:** `"find articles covering product launches by Apple"`
+**Right:** `"product launches announced by Apple in the last 14 days"`
 
-### Step 1 — Submit a query
+This distinction applies to validators and enrichments too. Never write a
+validator like `"article mentions a product launch"` — write
+`"a company has officially announced a new product or feature"`.
 
-The only required field is `query`. When you submit with just a query, the system
-automatically selects appropriate validators, enrichments, and date ranges.
+---
 
-**POST** `/catchAll/submit`
+## How to build a query
 
-Minimal (recommended for most cases):
+Write a natural language sentence that describes the real-world event or fact
+you are looking for. CatchAll processes natural language — do not reduce it to
+keyword strings.
 
-```json
-{ "query": "Find all M&A deals in the tech sector last 7 days" }
-```
-The system automatically selects appropriate validators, enrichments, and date
-ranges based on the query. **This is the preferred path** — the auto-selected
-parameters are good defaults for most queries.
+**Formula: describe what happened + 2–4 specifics**
 
-Custom overrides (only when the user explicitly requests specific filters or fields):
-
-```json
-{
-  "query": "Find all M&A deals in the tech sector last 7 days",
-  "context": "Focus on deals over $1B",
-  "limit": 50,
-  "start_date": "2026-01-30T00:00:00Z",
-  "end_date": "2026-02-07T00:00:00Z",
-  "validators": [
-       { "name": "is_ma_deal", "description": "True if the article reports on a specific merger or acquisition deal between two named companies, not general M&A commentary", "type": "boolean" },
-    { "name": "is_event_in_last_7_days", "description": "True if the deal was announced or closed within the last 7 days", "type": "boolean" },
-    { "name": "involves_tech", "description": "True if at least one party is a technology company", "type": "boolean" }
-  ],
-  "enrichments": [
-    { "name": "deal_value", "description": "Estimated deal value in USD", "type": "number" },
-    { "name": "acquiring_company", "description": "Name of the acquiring company", "type": "company" }
-  ]
-}
-```
-
-> **When to use custom validators/enrichments**: Only provide these when the user gives explicit instructions about filtering or data extraction — e.g. "make sure  to filter out deals under $10M" or "I also need the acquirer's country." If the  user just describes what they're looking for without specifying filters, submit  with only the query and let the system choose.
-
-**If you do provide custom validators, use multiple.** Each validator acts as a
-filter — an article must pass *all* of them to count as a valid record. Since you
-pay per valid record, using 3–5 specific validators is the best way to keep results
-relevant and costs under control. A single broad validator will let too much noise
-through. Break the user's filtering instructions into separate validation checks:
-event type, timeframe, industry, geography, significance, etc.
-See `references/VALIDATORS.md` for detailed guidance.
-
-Returns `{ "job_id": "<uuid>" }`.
-
-**When to use `limit`**: The `limit` field is optional but important for controlling
-cost and speed. Use this heuristic based on the user's intent:
-
-| User intent | Example query | Action |
-|---|---|---|
-| Exhaustive / "catch all" | "Find **all** lawsuits filed against Big Tech in 2025" | Do **not** set `limit` — let the system fetch everything |
-| Exploratory / general | "M&A in pharma industry in the last 30 days" | Set a `limit` (e.g. 50 to avoid over-fetching |
-| Specific / narrow | "Latest news about Nvidia's earnings" | Set a low `limit` (e.g. 10) |
-
-Look for signals like "all", "every", "complete list", "catch all", or "comprehensive"
-to indicate exhaustive intent. When the query is a broad topic scan without these
-signals, default to suggesting a reasonable `limit`. The user can always call
-`/continue` later to expand results if the initial set isn't enough.
-
-**Enrichment types**: `text`, `number`, `date`, `option`, `url`, `company`.
-
-### Step 1a — Preview with Initialize (optional)
-
-Use `/initialize` when you want to **preview** what the system would auto-select
-before committing to a full run. This is useful for exploration or when the user
-is unsure about the right parameters.
-
-**POST** `/catchAll/initialize`
-
-```json
-{ "query": "AI chip export restrictions", "context": "" }
-```
-
-Returns suggested `validators`, `enrichments`, `start_date`, `end_date`.
-
-**Intended workflow**: take the `/initialize` output, optionally adjust it (tweak
-dates, add/remove enrichments, refine validators), then pass the result into
-`/submit`. Think of it as a dry-run preview — it shows what *would* be configured
-without actually starting a job.
-
-> **When to skip**: If the user has a clear query and trusts the defaults, go
-> straight to `/submit` with just the query. Only use `/initialize` when the user
-> wants to inspect or customize parameters before running.
-
-### Step 2 — Poll for status
-
-**GET** `/catchAll/status/{job_id}`
-
-Returns:
-
-```json
-{
-  "job_id": "...",
-  "status": "clustering",
-  "steps": [
-    { "status": "submitted", "order": 1, "completed": true },
-    { "status": "analyzing", "order": 2, "completed": true },
-    { "status": "fetching", "order": 3, "completed": true },
-    { "status": "clustering", "order": 4, "completed": false },
-    { "status": "enriching", "order": 5, "completed": false },
-    { "status": "completed", "order": 6, "completed": false }
-  ]
-}
-```
-
-**Status progression**: `submitted → analyzing → fetching → clustering → enriching → completed`
-
-**You don't need to wait for completion to see results.** The system processes
-articles incrementally, so partial results are available early:
-
-1. **After ~1–2 minutes**: call `/pull` to get the first batch of results (e.g. 14
-   records may already be ready while processing continues in the background).
-2. **Then poll `/status` every ~60 seconds** to track progress toward completion.
-3. **Pull again** whenever you want fresher results, or wait until status is
-   `completed` for the full set.
-
-This means agents can start presenting results to the user almost immediately
-while the job is still running, then refresh once it finishes.
-
-
-### Step 3 — Pull results
-
-**GET** `/catchAll/pull/{job_id}?page=1&page_size=100`
-
-Returns clustered, validated, and enriched articles:
-
-| Field | Description |
+| Specifics | Notes |
 |---|---|
-| `query` | Original query |
-| `status` | Job status |
-| `candidate_records` | Total articles found |
-| `valid_records` | Articles passing validators |
-| `all_records` | The clustered article data |
-| `page` / `page_size` / `total_pages` | Pagination info |
-| `duration` | Processing time |
-| `date_range` | Date window of results |
+| **Event type** | What occurred — acquisition, product launch, regulatory fine, leadership change, etc. |
+| **Entity** | Company, person, geography, or industry involved — only if specified by the user |
+| **Timeframe** | Explicit window within 30 days ("last 14 days"); never open-ended ("since January") |
+| **Location** | City, region, country, or global; omit if not specified |
 
-## CRITICAL: Result Presentation
+**Examples:**
 
-When presenting results to the user (regardless of interface - script, Claude Desktop, claude.ai):
+| User input | Query to build |
+|---|---|
+| "EU fines on Big Tech last month" | `"fines or penalties imposed on Big Tech companies by EU regulators in the last 30 days"` |
+| "new AI models released this week" | `"AI models or AI systems officially launched or released in the last 7 days"` |
+| "executive departures at banks" | ask for timeframe, then: `"CEO or C-suite departures at major banks announced in the last 30 days"` |
+| "supply chain disruptions in semiconductors" | `"supply chain disruptions or shortages affecting semiconductor companies in the last 14 days"` |
 
-**ALWAYS show the EXACT number of results returned by the API:**
-- If API returns 10 records → show ALL 10
-- If API returns 15 records → show ALL 15  
-- If API returns 50 records → show ALL 50
-- NEVER skip any records
+**Constraint limit:** Cap at 4 meaningful constraints. More than that and results
+will silently return nothing — CatchAll can't match a 6-way intersection that
+rarely appears in a single source.
 
-**By default, For EACH record, display:**
-- `record_title` (full title, not truncated)
-- Key enrichment data (deal_value, company_name, etc.)
-- At least 1 citation link with title
-If a user asked to display in a custom way, obey.
+If the user has not provided a timeframe, ask before submitting.
 
-**WHY this matters:**
-The user set a specific limit for a reason - they want to see that EXACT number of results.
-Reducing 15→12 or 20→15 breaks user expectations and wastes API quota.
+**Timeframe window:** Max 30 days per query. For longer requests, split into
+consecutive 30-day windows and run each as a separate job.
 
-**Example:**
-```
-User requested limit=15
-API returned 15 records
-You MUST show all 15 with titles, not "here are 12 highlights"
-```
+---
 
+## Before you submit: validate_query
 
-### Step 4 — Continue a job (optional)
+Run `validate_query` when the user's query is ambiguous, very broad, or likely
+to be misinterpreted. It checks query quality without creating a job or spending
+credits.
 
-If more articles are needed beyond the initial limit:
+Returns `status`:
+- `good` — submit as-is
+- `needs_work` — review `issues` and `suggestions` before submitting
+- `critical` — rewrite before submitting; the query will likely return nothing useful
 
-**POST** `/catchAll/continue`
+**When to use it:**
 
-```json
-{ "job_id": "<uuid>", "new_limit": 200 }
-```
+- Query is vague ("tell me about Tesla")
+- Query mixes event descriptions with page-description language
+- You are unsure whether the query is too constrained or too broad
 
-`new_limit` must be greater than the previous limit.
+**When to skip it:** The user has a clear, well-formed event query — go straight
+to `submit_query`.
 
-### List user jobs
+---
 
-**GET** `/catchAll/jobs/user?page=1&page_size=100`
+## Tool reference
 
-Returns paginated history of all jobs for the authenticated user.
+### Jobs
 
-## Monitors workflow
+| Task | Tool |
+|---|---|
+| Check query quality before submitting | `validate_query` |
+| Preview auto-selected validators/enrichments/dates | `initialize_query` |
+| Submit a query and start a job | `submit_query` |
+| Check job processing status | `get_job_status` |
+| Retrieve results (partial or complete) | `pull_results` |
+| Fetch more records beyond the initial limit | `continue_job` |
+| List past jobs | `list_user_jobs` |
+| Delete a job and its results | `delete_job` |
 
-Monitors let you schedule recurring runs of a completed job's query. They are
-designed for the **explore → refine → automate** pattern:
+**Polling cadence:** call `pull_results` after ~1–2 minutes — results are
+available incrementally before the job completes. Then poll `get_job_status`
+every ~60 seconds to track completion.
 
-1. **Explore**: Submit a job, review the results.
-2. **Refine**: Adjust validators, enrichments, date ranges — submit again until
-   the output matches exactly what you need.
-3. **Automate**: Once you're satisfied with the results, create a monitor using
-   that job's ID as the `reference_job_id`. The monitor re-runs the same query
-   with the same parameters on a schedule, and can push results to a webhook.
+**Status progression:** `submitted → analyzing → fetching → clustering → enriching → completed`
 
-> **When to suggest a monitor**: If the user has iterated on a query and is happy
-> with the output, proactively suggest setting up a monitor. This is especially
-> valuable for data analysts who need a recurring feed — e.g. daily M&A deals,
-> weekly funding rounds, or hourly breaking news on a topic.
+### Monitors
 
-### Create a monitor
+| Task | Tool |
+|---|---|
+| Create a recurring scheduled job | `create_monitor` |
+| List all active monitors | `list_monitors` |
+| Get latest run output | `pull_monitor_results` |
+| See all runs for a monitor | `list_monitor_jobs` |
+| See monitor state change history | `get_monitor_status` |
+| Pause a monitor | `disable_monitor` |
+| Resume a paused monitor | `enable_monitor` |
+| Change webhook or per-run limit | `update_monitor` |
+| Delete a monitor permanently | `delete_monitor` |
 
-**POST** `/catchAll/monitors/create`
+### Webhooks
 
-```json
-{
-  "reference_job_id": "<uuid>",
-  "schedule": "every day at 9 AM EST",
-  "webhook": {
-    "url": "https://your-endpoint.com/hook",
-    "method": "POST",
-    "headers": { "Authorization": "Bearer ..." }
-  }
-}
-```
+| Task | Tool |
+|---|---|
+| Create a webhook endpoint | `create_webhook` |
+| List all webhooks | `list_webhooks` |
+| Get full webhook config | `get_webhook` |
+| Update webhook settings | `update_webhook` |
+| Test a webhook before attaching it | `test_webhook` |
+| Attach a webhook to a job or monitor | `assign_webhook_resource` |
+| List webhooks on a resource | `list_resource_webhooks` |
+| List resources attached to a webhook | `list_webhook_resources` |
+| Remove a webhook from a resource | `remove_webhook_resource` |
+| View delivery history | `get_webhook_history` |
+| Delete a webhook | `delete_webhook` |
 
-The `webhook` is optional. If provided it fires on each run with `url` (required), `method` (POST or PUT), `headers`, `params`, and `auth` (basic auth tuple).
+### Datasets & Entities
 
-### List monitors
+| Task | Tool |
+|---|---|
+| Create a single entity (company or person) | `create_entity` |
+| Create multiple entities at once | `create_entities_batch` |
+| Get / update / delete an entity | `get_entity` / `update_entity` / `delete_entity` |
+| List all entities | `list_entities` |
+| Create a dataset (named collection of entities) | `create_dataset` |
+| Add / remove entities from a dataset | `add_dataset_entities` / `remove_dataset_entities` |
+| List entities in a dataset | `list_dataset_entities` |
+| Get dataset enrichment status | `get_dataset_status` |
+| List all datasets | `list_datasets` |
+| Delete a dataset (entities are preserved) | `delete_dataset` |
 
-**GET** `/catchAll/monitors/`
+### Projects
 
-Returns all monitors for the user with their schedule, status, and reference query.
+| Task | Tool |
+|---|---|
+| Create a project | `create_project` |
+| List all projects | `list_projects` |
+| Get resource summary for a project | `get_project_overview` |
+| Add jobs / monitors / datasets to a project | `add_project_resources` |
+| List resources inside a project | `list_project_resources` |
+| Remove a resource from a project | `remove_project_resource` |
+| Update or delete a project | `update_project` / `delete_project` |
 
-### Pull monitor results
+### Utilities
 
-**GET** `/catchAll/monitors/pull/{monitor_id}`
+| Task | Tool |
+|---|---|
+| Check credit usage and plan limits | `get_user_limits` |
+| Check API health | `check_health` |
 
-Returns the latest run results including `run_info`, `records`, and `all_records`.
+---
 
-### List monitor job history
+## Job modes
 
-**GET** `/catchAll/monitors/{monitor_id}/jobs?sort=asc`
+Pass `mode` in `submit_query`:
 
-Returns all jobs spawned by the monitor, sorted by `start_date`.
+| Mode | Speed | Cost | Enrichments | Use when |
+|---|---|---|---|---|
+| `base` (default) | Standard | Standard | Full enrichment pipeline | User needs structured data fields, deduplication, clustering |
+| `lite` | Faster | Lower | Validators only, no enrichment metadata | User needs fast filtering with no structured extraction |
 
-### Enable / Disable a monitor
+Use `lite` when the user just wants to know if something happened and doesn't
+need specific fields extracted. Use `base` for any structured output.
 
-**POST** `/catchAll/monitors/{monitor_id}/enable`
-**POST** `/catchAll/monitors/{monitor_id}/disable`
+---
 
-### Update a monitor
+## Limit vs. page_size — critical distinction
 
-**PATCH** `/catchAll/monitors/{monitor_id}`
+| Parameter | Where | Cost impact | Purpose |
+|---|---|---|---|
+| `limit` | `submit_query`, `continue_job`, `update_monitor` | **Yes — affects billing** | How many records to process and validate |
+| `page_size` | `pull_results`, list tools | **No — free** | How many records to return per API response |
 
-```json
-{
-  "webhook": {
-    "url": "https://new-endpoint.com/hook",
-    "method": "POST"
-  }
-}
-```
+**Never use `page_size` to control how much data is processed.** Use `page_size`
+only for pagination of results already processed by a job. The `limit` is the
+lever that controls both scope and cost.
 
-## Error handling
+### Limit heuristics
 
-| Code | Meaning | Action |
+| User intent | Signal words | Action |
 |---|---|---|
-| `403` | Invalid or missing `X-API-Key` | Check API key |
-| `422` | Validation error | Inspect `detail[].loc` and `detail[].msg` for field-level errors |
-| `200` with error status | Job failed internally | Retry with a refined query |
+| Exhaustive | "all", "every", "complete list", "catch all" | Omit `limit` |
+| Exploratory | general topic scan, no quantity stated | `limit: 50` |
+| Specific / narrow | single entity, single event, "latest" | `limit: 10` |
+
+The user can always call `continue_job` later to expand beyond the initial limit.
+
+---
+
+## Validators
+
+Validators are boolean filters. An article must pass **all** of them to count
+as a valid (billed) record. When the user submits with just a query, CatchAll
+auto-selects validators — this is the preferred path for most cases.
+
+Specify custom validators only when the user gives explicit filtering
+instructions ("exclude rumors", "only confirmed deals", "must mention a dollar
+amount"). When you do:
+
+- Use 3–5 validators, not just one — a single broad validator lets noise through
+- Break filtering intent into separate checks: event type, timeframe, geography, significance
+- Write descriptions as event-scoped assertions, not page descriptions
+
+See `references/VALIDATORS.md` for detailed guidance and examples.
+
+---
+
+## Enrichments
+
+Enrichments are structured fields extracted from each valid result. Enrichment
+types: `text`, `number`, `date`, `option`, `url`, `company`.
+
+**When to specify enrichments:** user needs a structured table, a CSV export, or
+specific named fields (deal value, company name, announcement date).
+
+**When to skip:** user asks for a free-form summary or "just tell me what
+happened" — let the agent interpret result text directly without pre-defined fields.
+
+When you define enrichments, be explicit about the field names so they stay
+stable across runs. Unstable field names break downstream formatting.
+
+---
+
+## Datasets & Entities: watchlist mode
+
+Use datasets when the user wants to track a specific list of companies or people
+rather than a broad topic. This is "watchlist mode" — results are attributed back
+to named entities in the list.
+
+**Workflow:**
+
+1. Create entities with `create_entity` or `create_entities_batch` (type: `company` or `person`)
+2. Create a dataset with `create_dataset` and add entities to it
+3. Wait for dataset status to reach `ready` — entities are enriched before first use
+4. Pass `connected_dataset_ids: [<dataset_id>]` in `submit_query`
+
+**When to use watchlist mode:**
+
+- "Track these 10 competitors" — named company list
+- "Monitor news about our supplier list" — uploaded CSV of companies
+- "What's been happening at these 50 clients" — known entity set
+
+**When not to use it:** broad topic queries with no named entity list. Watchlist
+mode narrows results to entities in the dataset — it will miss relevant events
+involving companies not on the list.
+
+**Dataset health:** `get_dataset_status` shows enrichment progress. A dataset
+with low `health_score` (entities that failed enrichment) will produce fewer
+results. Check it before large runs.
+
+---
+
+## Webhooks: delivery setup
+
+Webhooks push job or monitor results to an external endpoint automatically.
+Always test before attaching.
+
+**Setup workflow:**
+
+1. `create_webhook` — register the endpoint (name, url, type, auth)
+2. `test_webhook` — verify it receives a payload correctly
+3. `assign_webhook_resource` — attach the webhook to a job or monitor
+
+**Delivery modes:**
+
+| Mode | Behavior | Use when |
+|---|---|---|
+| `full` | One call with all results when job completes | Downstream system processes batches |
+| `per_record` | One call per article as results arrive | Streaming pipelines, real-time triggers |
+
+**Webhook types:** `generic` (raw JSON), `slack` (pre-formatted Slack message),
+`teams` (pre-formatted Teams card), `custom` (user-defined formatter).
+
+**Auth options:** `bearer` token, `api_key` (custom header + value), or `basic`
+(username + password).
+
+**Important:** A webhook attached to a monitor fires on every scheduled run
+automatically — no extra steps needed after `assign_webhook_resource`.
+
+---
+
+## Projects: organizing work
+
+Projects group related jobs, monitors, and datasets together. Use them when:
+
+- The user is running multiple related queries (e.g., "all my competitive intelligence work")
+- Multiple team members share a workspace and need to filter by initiative
+- The user wants an overview of all resources for a given topic
+
+**Workflow:**
+
+1. `create_project` — give it a name and description
+2. Submit jobs / create monitors / build datasets as usual
+3. `add_project_resources` — attach completed resources to the project
+4. `get_project_overview` — see counts by resource type and status
+
+Projects are organizational only — they don't affect job processing or billing.
+Deleting a project with `delete_resources: false` (the default) leaves all
+resources intact.
+
+---
+
+## Monitor workflow
+
+Monitors re-run a completed job's query on a schedule and push results to a
+webhook. Follow the **explore → refine → automate** pattern:
+
+1. **Explore** — submit a job, review results with the user
+2. **Refine** — adjust query, validators, or enrichments until the output matches exactly what is needed
+3. **Automate** — once the user is satisfied, create a monitor from that job using `create_monitor`
+
+**Key parameters for `create_monitor`:**
+
+| Parameter | Notes |
+|---|---|
+| `reference_job_id` | Must be a completed job — this is the template |
+| `schedule` | Natural language with timezone: "every day at 9 AM EST", "every Monday at 8 AM UTC" |
+| `backfill` | Default `true` — fills the gap between the reference job's end date and now. Only works if the reference job's end date is within the last 7 days. Set to `false` for forward-only monitors. |
+| `webhook_ids` | Optional — attach one or more webhooks at creation time |
+| `limit` | Per-run record cap; can be changed later via `update_monitor` |
+
+For schedule syntax and natural-language examples, see
+`references/MONITOR-SCHEDULING.md`.
+
+Proactively suggest a monitor when the user has iterated on a query and is happy
+with the output — especially for recurring needs like daily M&A deals, weekly
+funding rounds, or ongoing topic tracking.
+
+---
+
+## Result presentation
+
+**Always show the exact number of records returned — never fewer.**
+
+- If the job returns 10 records → show all 10
+- If the job returns 50 records → show all 50
+- Never skip records or say "here are the highlights"
+
+For each record, display by default:
+- Full title (not truncated)
+- Key enrichment fields if present
+- At least one citation link (`citations[0].link` from the record)
+
+The user set a `limit` for a reason. Silently reducing results breaks
+expectations and wastes quota.
+
+---
+
+## No-results fallback
+
+If a job returns zero valid records (`valid_records: 0`), escalate in steps:
+
+1. **Check `candidate_records`** — if > 0, validators are too strict. Loosen them or resubmit with just the query (auto-validators). Tell the user.
+2. **Check for over-constraining** — if the query has 5+ constraints, drop the most restrictive one first. Tell the user which was dropped.
+3. **Expand the timeframe** — widen to 30 days if shorter. Tell the user.
+4. **Expand the geography** — widen one level (city → region → country → global). Tell the user.
+5. **Broaden the event type** — remove the most specific qualifier. Tell the user.
+6. **Advise honestly** — if all steps produce nothing: "There may be limited coverage for this topic in the available sources."
+
+Always explain what changed before resubmitting.
+
+---
 
 ## Edge cases
 
-| Scenario | Recommendation |
+| Scenario | Action |
 |---|---|
 | Job stuck in `fetching` for >5 min | Re-poll; if persistent, submit a new job |
-| `valid_records` is 0 | Loosen validators or broaden the query |
-| Results span unexpected dates | Use explicit `start_date` / `end_date` on submit |
-| Need >100 results per page | Paginate with `page` param (max `page_size` is 100) |
-| Monitor webhook fails | Check URL reachability; update webhook via PATCH |
-
-## File reference summary
-
-| Path | Purpose |
-|---|---|
-| `references/OPENAPI-SPEC.json` | Full OpenAPI 3.0 spec for the CatchAll API |
-| `references/ENRICHMENT-TYPES.md` | Detailed guide to enrichment types and usage |
-| `references/MONITOR-SCHEDULING.md` | Cron expressions and natural language schedule examples |
-| `assets/example-submit.json` | Example submit request body |
-| `assets/example-pull-response.json` | Example pull response with clusters |
+| `valid_records: 0`, `candidate_records: 0` | Query produced no raw matches — broaden it |
+| `valid_records: 0`, `candidate_records: N` | Validators filtered everything — loosen or remove validators |
+| User asks for data beyond 30 days | Split into consecutive 30-day windows; run each as a separate job |
+| Dataset status not `ready` | Wait for enrichment to complete before attaching to a job |
+| Dataset `health_score` is low | Some entities failed enrichment — check `list_dataset_entities` for `status: failed` |
+| Monitor webhook fails | Use `get_webhook_history` to diagnose; `update_monitor` or `update_webhook` to fix |
+| User wants to re-pull a past job | `list_user_jobs` to find the `job_id`, then `pull_results` |
+| User wants to share work with a teammate | Add resources to a project; teammates with access can filter by project |
