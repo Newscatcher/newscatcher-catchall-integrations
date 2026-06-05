@@ -1,5 +1,5 @@
 ---
-name: catchall
+name: general-use-case-catchall
 description: >
   Extract structured, validated data from thousands of web sources at scale.
   Unlike standard web search which returns a handful of links, this skill finds

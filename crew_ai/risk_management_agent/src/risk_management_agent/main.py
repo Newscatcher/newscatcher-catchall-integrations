@@ -145,7 +145,7 @@ def prompt_user() -> tuple:
 
 def run(mode: str = None, source_id: str = None):
     """Run the risk management crew."""
-    from risk_managment_agent.crew import RiskManagmentAgent
+    from risk_management_agent.crew import RiskManagementAgent
     
     sys.stdout.write("=" * 70 + "\n")
     sys.stdout.write("🚗 AUTOMOTIVE SUPPLY CHAIN RISK MANAGEMENT\n")
@@ -182,7 +182,7 @@ def run(mode: str = None, source_id: str = None):
     }
     
     try:
-        result = RiskManagmentAgent().crew().kickoff(inputs=inputs)
+        result = RiskManagementAgent().crew().kickoff(inputs=inputs)
         return result
     except Exception as e:
         raise Exception(f"Error running crew: {e}")
