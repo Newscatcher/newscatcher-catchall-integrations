@@ -1,0 +1,321 @@
+<style>
+  .vc-pack-page { max-width: 720px; margin: 32px auto; padding: 0 16px; font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif); font-size: 14px; line-height: 1.5; color: var(--color-text-primary, #1f1e1a); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  .vc-pack-page * { box-sizing: border-box; }
+  .vc-pack-page h2 { font-family: inherit; }
+  .vc-pack-page button { font-family: inherit; }
+  .kpi-tall { border-radius: var(--border-radius-md, 8px); display: grid; grid-template-columns: 1fr; grid-template-rows: subgrid; row-gap: 0; }
+  .kpi-tall-funding { background: #EEF1EA; grid-column: 1; grid-row: 1 / 5; }
+  .kpi-tall-ma { background: #EDEEF2; grid-column: 2; grid-row: 1 / 4; }
+  .kpi-section { padding: 14px 16px; }
+  .kpi-section + .kpi-section { border-top: 1px dotted rgba(0, 0, 0, 0.18); }
+  .kpi-label { font-size: 11px; color: var(--color-text-secondary, #5d5b51); margin-bottom: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .kpi-section-label { font-size: 11px; color: var(--color-text-tertiary, #8d8a78); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; font-weight: 500; }
+  .kpi-split { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 4px; }
+  .kpi-split > div:last-child { text-align: right; }
+  .kpi-stat-num, .kpi-stat-amt { font-size: 28px; font-weight: 500; color: var(--color-text-primary, #1f1e1a); line-height: 1; }
+  .kpi-stat-sub { font-size: 11px; color: var(--color-text-tertiary, #8d8a78); margin-top: 6px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .kpi-asterisk { color: var(--color-text-tertiary, #8d8a78); font-size: 18px; margin-left: 2px; vertical-align: top; }
+  .kpi-asterisk-inline { font-size: 11px; color: var(--color-text-tertiary, #8d8a78); margin-top: 10px; line-height: 1.45; text-align: right; }
+  .kpi-special { background: linear-gradient(to right, #EEF1EA, #EDEEF2); border-radius: var(--border-radius-md, 8px); padding: 14px 16px; display: flex; flex-direction: column; grid-column: 2; grid-row: 4; margin-top: 12px; }
+  .kpi-main-headline { font-size: 26px; font-weight: 500; color: var(--color-text-primary, #1f1e1a); line-height: 1.1; margin-bottom: 4px; }
+  .kpi-sub-line { font-size: 12px; color: var(--color-text-secondary, #5d5b51); margin-bottom: 12px; }
+  .topdeal-row { display: flex; align-items: baseline; justify-content: space-between; padding: 6px 0; font-size: 12.5px; gap: 8px; border-bottom: 0.5px solid rgba(0, 0, 0, 0.06); }
+  .topdeal-name { color: var(--color-text-primary, #1f1e1a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topdeal-name .arrow { color: var(--color-text-tertiary, #8d8a78); margin: 0 4px; }
+  .topdeal-amt { color: var(--color-text-primary, #1f1e1a); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .list-footer { font-size: 12px; color: var(--color-text-tertiary, #8d8a78); font-style: italic; padding-top: 10px; }
+  .cat-row { display: grid; grid-template-columns: 150px 1fr 58px; align-items: center; gap: 8px; padding: 4px 0; }
+  .cat-header-row { display: grid; grid-template-columns: 150px 1fr 58px; align-items: center; gap: 8px; padding: 0 0 6px 0; }
+  .cat-amt-header { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-tertiary, #8d8a78); text-align: right; font-weight: 500; }
+  .cat-label { color: var(--color-text-primary, #1f1e1a); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: capitalize; }
+  .cat-bar-track { height: 22px; background: rgba(0, 0, 0, 0.06); border-radius: 4px; overflow: hidden; }
+  .cat-bar-fill { height: 100%; background: var(--color-text-secondary, #5d5b51); border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: #fff; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; min-width: 26px; box-sizing: border-box; }
+  .cat-amt { color: var(--color-text-tertiary, #8d8a78); text-align: right; font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ratio-row { display: grid; grid-template-columns: 56px 1fr 64px; align-items: center; gap: 8px; font-size: 12px; padding: 6px 0; }
+  .ratio-label { color: var(--color-text-primary, #1f1e1a); white-space: nowrap; font-weight: 500; }
+  .ratio-track { height: 10px; background: rgba(0, 0, 0, 0.06); border-radius: 5px; overflow: hidden; }
+  .ratio-fill-ma { height: 100%; background: #7F77DD; border-radius: 5px; }
+  .ratio-fill-eq { height: 100%; background: #4A8B7E; border-radius: 5px; }
+  .ratio-amt { color: var(--color-text-secondary, #5d5b51); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .footnote { font-size: 11px; color: var(--color-text-tertiary, #8d8a78); margin-top: 12px; line-height: 1.45; font-style: italic; }
+  .stack-bar { display: flex; height: 28px; border-radius: var(--border-radius-md, 8px); overflow: hidden; margin: 6px 0 10px; }
+  .stack-seg { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: #fff; min-width: 0; }
+  .legend-item { display: flex; align-items: center; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+  .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+  .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--color-border-tertiary, rgba(0,0,0,0.08)); margin-bottom: 14px; }
+  .tab-group { display: flex; }
+  .tab-btn { padding: 12px 20px !important; background: transparent !important; border: none !important; border-bottom: 2px solid transparent !important; border-radius: 0 !important; font-size: 14px !important; font-weight: 500 !important; color: var(--color-text-tertiary, #8d8a78) !important; cursor: pointer; font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif); margin-bottom: -1px; transition: color 0.15s, border-color 0.15s; }
+  .tab-btn[data-tab="funding"].active { color: var(--color-text-primary, #1f1e1a) !important; border-bottom-color: #2D6B5E !important; }
+  .tab-btn[data-tab="ma"].active { color: var(--color-text-primary, #1f1e1a) !important; border-bottom-color: #534AB7 !important; }
+  .tab-btn:hover:not(.active) { color: var(--color-text-secondary, #5d5b51) !important; }
+  .toolbar-search { flex: 0 1 280px; padding-bottom: 8px; }
+  .search-input { width: 100%; padding: 5px 10px; border: 0.5px solid var(--color-border-tertiary, rgba(0,0,0,0.08)); border-radius: var(--border-radius-md, 8px); font-size: 11.5px; font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif); background: transparent; color: var(--color-text-primary, #1f1e1a); box-sizing: border-box; line-height: 1.5; }
+  .search-input::placeholder { color: var(--color-text-tertiary, #8d8a78); }
+  .search-input:focus { outline: none; border-color: var(--color-border-secondary, rgba(0,0,0,0.15)); }
+  .vc-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+  .vc-table th { text-align: left; font-weight: 500; color: var(--color-text-secondary, #5d5b51); padding: 8px 10px; border-bottom: 0.5px solid var(--color-border-secondary, rgba(0,0,0,0.15)); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vc-table th.sortable { cursor: pointer; }
+  .vc-table th.sortable:hover { color: var(--color-text-primary, #1f1e1a); }
+  .vc-table th .arrow { display: inline-block; opacity: 0.4; margin-left: 2px; font-size: 10px; }
+  .vc-table th.sorted .arrow { opacity: 1; color: var(--color-text-primary, #1f1e1a); }
+  .vc-table td { padding: 12px 10px; border-bottom: 0.5px solid var(--color-border-tertiary, rgba(0,0,0,0.08)); vertical-align: top; overflow: hidden; }
+  .vc-table tbody tr:hover { background: var(--color-background-secondary, rgba(0,0,0,0.04)); }
+  .vc-table tbody tr.hidden { display: none; }
+  .right { text-align: right; }
+  .co-name { font-weight: 500; color: var(--color-text-primary, #1f1e1a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+  .co-sub { font-size: 11px; color: var(--color-text-tertiary, #8d8a78); margin-top: 3px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .sector-chip { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; background: rgba(0, 0, 0, 0.06); color: var(--color-text-secondary, #5d5b51); font-weight: 500; margin-top: 5px; letter-spacing: 0.02em; text-transform: capitalize; }
+  .stage-cell { font-size: 12px; color: var(--color-text-secondary, #5d5b51); line-height: 1.3; word-break: break-word; }
+  .amt { font-weight: 500; color: var(--color-text-primary, #1f1e1a); white-space: nowrap; }
+  .amt-undisc { color: var(--color-text-tertiary, #8d8a78); font-weight: 400; font-size: 12px; }
+  .amt-tag { display: block; font-size: 10px; color: #854F0B; font-weight: 400; margin-top: 2px; white-space: normal; line-height: 1.25; }
+  .investors-list { font-size: 12px; color: var(--color-text-secondary, #5d5b51); line-height: 1.4; }
+  .investor-more { color: var(--color-text-tertiary, #8d8a78); font-style: italic; white-space: nowrap; }
+  .investor-undisc { color: var(--color-text-tertiary, #8d8a78); font-style: italic; }
+  .lead-name-strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--color-text-primary, #1f1e1a); font-weight: 500; }
+  .date-cell { color: var(--color-text-tertiary, #8d8a78); font-size: 12px; white-space: nowrap; }
+  .src-link { color: var(--color-text-info, #2563eb); text-decoration: none; font-size: 13px; }
+  .src-link:hover { text-decoration: underline; }
+  .buyer-chip { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 500; letter-spacing: 0.02em; white-space: nowrap; margin-top: 4px; }
+  .buyer-chip-leader { background: #E6F1FB; color: #185FA5; }
+  .buyer-chip-same { background: #EEEDFE; color: #534AB7; }
+  .buyer-chip-adjacent { background: #F1EFE8; color: #5F5E5A; }
+  .buyer-chip-financial { background: #FBF1E6; color: #A56518; }
+  .buyer-chip-unclear { background: rgba(0,0,0,0.06); color: var(--color-text-secondary, #5d5b51); }
+  .header-eyebrow { font-size: 11px; color: var(--color-text-tertiary, #8d8a78); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; margin-bottom: 6px; }
+  .vc-runstats { display: flex; align-items: center; gap: 14px; padding: 14px 0; margin-bottom: 1.75rem; border-top: 0.5px solid var(--color-border-tertiary, rgba(0,0,0,0.08)); border-bottom: 0.5px solid var(--color-border-tertiary, rgba(0,0,0,0.08)); font-size: 13px; letter-spacing: 0.03em; text-transform: uppercase; color: var(--color-text-tertiary, #8d8a78); flex-wrap: wrap; }
+  .vc-runstats b { color: var(--color-text-secondary, #5d5b51); font-weight: 500; }
+  .vc-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .vc-header h2 { font-size: 22px; font-weight: 500; margin: 0; }
+  .vc-header-window { font-size: 18px; font-weight: 500; color: var(--color-text-primary, #1f1e1a); }
+  .vc-header-dates { font-size: 12px; color: var(--color-text-tertiary, #8d8a78); margin-top: 2px; }
+  .vc-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto auto; column-gap: 12px; row-gap: 0; margin-bottom: 1.5rem; }
+</style>
+
+<div class="vc-pack-page">
+
+  <h2 class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">VC pack capital activity dashboard</h2>
+
+  <div class="vc-runstats">
+    <span><b>{{ARTICLES_SCANNED}}</b> articles scanned</span>
+    <span style="opacity:.5;">→</span>
+    <span><b>{{DEALS_FOUND}}</b> deals found</span>
+    <span style="margin-left:auto;opacity:.6;">via CatchAll</span>
+  </div>
+
+  <div class="vc-header">
+    <div>
+      <div class="header-eyebrow">Funding &amp; M&amp;A activity</div>
+      <h2>{{MARKET}}, {{LOCATION}}</h2>
+    </div>
+    <div style="text-align:right;">
+      <div class="vc-header-window">Last {{WINDOW_DAYS}} days</div>
+      <div class="vc-header-dates">{{DATE_RANGE}}</div>
+    </div>
+  </div>
+
+  <div class="vc-grid">
+
+    <div class="kpi-tall kpi-tall-funding">
+      <div class="kpi-section">
+        <div class="kpi-label">Funding</div>
+        <div class="kpi-split">
+          <div><div class="kpi-stat-num">{{FUNDING_TOTAL_DEALS}}</div><div class="kpi-stat-sub">deals</div></div>
+          <div><div class="kpi-stat-amt">{{FUNDING_TOTAL_AMOUNT}}<span class="kpi-asterisk">*</span></div><div class="kpi-stat-sub">tracked</div></div>
+        </div>
+        <div class="kpi-asterisk-inline">* {{FUNDING_DISCLOSED_COUNT}} of {{FUNDING_TOTAL_DEALS}} deals disclose deal value.</div>
+      </div>
+      <div class="kpi-section">
+        <div class="kpi-section-label">Deal stage</div>
+        <div class="stack-bar">{{FUNDING_STAGE_BAR}}</div>
+        {{FUNDING_STAGE_LEGEND}}
+      </div>
+      <div class="kpi-section">
+        <div class="kpi-section-label">Most active investors</div>
+        {{FUNDING_INVESTORS}}
+        <div class="list-footer">+ {{FUNDING_OTHER_INVESTORS}} other investor{{FUNDING_INVESTOR_PLURAL}}</div>
+      </div>
+      <div class="kpi-section">
+        <div class="kpi-section-label">Sub-sectors by deal count</div>
+        <div class="cat-header-row">
+          <span></span>
+          <span></span>
+          <span class="cat-amt-header">Total funding</span>
+        </div>
+        {{FUNDING_SUBSECTORS}}
+      </div>
+    </div>
+
+    <div class="kpi-tall kpi-tall-ma">
+      <div class="kpi-section">
+        <div class="kpi-label">M&amp;A</div>
+        <div class="kpi-split">
+          <div><div class="kpi-stat-num">{{MA_TOTAL_DEALS}}</div><div class="kpi-stat-sub">deals</div></div>
+          <div><div class="kpi-stat-amt">{{MA_TOTAL_AMOUNT}}<span class="kpi-asterisk">*</span></div><div class="kpi-stat-sub">tracked</div></div>
+        </div>
+        <div class="kpi-asterisk-inline">* {{MA_DISCLOSED_COUNT}} of {{MA_TOTAL_DEALS}} deals disclose deal value.</div>
+      </div>
+      <div class="kpi-section">
+        <div class="kpi-section-label">Acquirer type</div>
+        <div class="stack-bar">{{MA_ACQUIRER_BAR}}</div>
+        {{MA_ACQUIRER_LEGEND}}
+      </div>
+      <div class="kpi-section">
+        <div class="kpi-section-label">Largest deals</div>
+        {{MA_LARGEST_DEALS}}
+        <div class="list-footer">+ {{MA_OTHER_DEALS}} other deal{{MA_DEAL_PLURAL}}</div>
+      </div>
+    </div>
+
+    <div class="kpi-special">
+      <div class="kpi-label">Capital ratio</div>
+      <div class="kpi-main-headline">{{RATIO_HEADLINE}}</div>
+      <div class="kpi-sub-line">{{RATIO_SUBLINE}}</div>
+      <div class="ratio-row">
+        <span class="ratio-label">M&amp;A</span>
+        <div class="ratio-track"><div class="ratio-fill-ma" style="width:{{RATIO_MA_PCT}}%;"></div></div>
+        <span class="ratio-amt">{{RATIO_MA_AMOUNT}}</span>
+      </div>
+      <div class="ratio-row">
+        <span class="ratio-label">Equity</span>
+        <div class="ratio-track"><div class="ratio-fill-eq" style="width:{{RATIO_EQUITY_PCT}}%;"></div></div>
+        <span class="ratio-amt">{{RATIO_EQUITY_AMOUNT}}</span>
+      </div>
+      {{RATIO_FOOTNOTE}}
+    </div>
+
+  </div>
+
+  <div class="toolbar">
+    <div class="tab-group">
+      <button class="tab-btn active" data-tab="funding">Funding rounds<span style="opacity:.5;margin-left:6px;">{{FUNDING_TAB_COUNT}}</span></button>
+      <button class="tab-btn" data-tab="ma">Acquisitions<span style="opacity:.5;margin-left:6px;">{{MA_TAB_COUNT}}</span></button>
+    </div>
+    <div class="toolbar-search">
+      <input type="text" class="search-input" id="search-funding" placeholder="Search company or investor…" />
+      <input type="text" class="search-input" id="search-ma" placeholder="Search target or acquirer…" style="display:none;" />
+    </div>
+  </div>
+
+  <div id="table-funding">
+    <table class="vc-table">
+      <colgroup>
+        <col style="width:28%;"><col style="width:14%;"><col style="width:11%;"><col style="width:33%;"><col style="width:9%;"><col style="width:5%;">
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="sortable" data-sort="co" data-table="funding">Company<span class="arrow">↕</span></th>
+          <th class="sortable right sorted" data-sort="amt" data-table="funding">Amount<span class="arrow">↓</span></th>
+          <th>Stage</th>
+          <th>Select investors</th>
+          <th class="sortable" data-sort="date" data-table="funding">Date<span class="arrow">↕</span></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody-funding">{{FUNDING_ROWS}}</tbody>
+    </table>
+  </div>
+
+  <div id="table-ma" style="display:none;">
+    <table class="vc-table">
+      <colgroup>
+        <col style="width:24%;"><col style="width:16%;"><col style="width:13%;"><col style="width:33%;"><col style="width:9%;"><col style="width:5%;">
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="sortable" data-sort="co" data-table="ma">Target<span class="arrow">↕</span></th>
+          <th>Deal type</th>
+          <th class="sortable right sorted" data-sort="amt" data-table="ma">Value<span class="arrow">↓</span></th>
+          <th>Acquirer</th>
+          <th class="sortable" data-sort="date" data-table="ma">Date<span class="arrow">↕</span></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody-ma">{{MA_ROWS}}</tbody>
+    </table>
+  </div>
+
+  {{FX_NOTE_BLOCK}}
+
+</div>
+
+<script>
+(function () {
+  var TABLES = { funding: 'tbody-funding', ma: 'tbody-ma' };
+  var SEARCH = { funding: 'search-funding', ma: 'search-ma' };
+  var sortState = {
+    funding: { key: 'amt', dir: 'desc' },
+    ma:      { key: 'amt', dir: 'desc' }
+  };
+
+  function sortTable(table, key, dir) {
+    var tbody = document.getElementById(TABLES[table]);
+    if (!tbody) return;
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+    rows.sort(function (a, b) {
+      var av, bv;
+      if (key === 'amt') {
+        av = parseFloat(a.dataset.amt); bv = parseFloat(b.dataset.amt);
+        if (isNaN(av)) av = -1;
+        if (isNaN(bv)) bv = -1;
+        return dir === 'desc' ? bv - av : av - bv;
+      }
+      if (key === 'co') {
+        av = (a.cells[0] && a.cells[0].textContent || '').toLowerCase();
+        bv = (b.cells[0] && b.cells[0].textContent || '').toLowerCase();
+      } else {
+        av = (a.dataset[key] || '').toLowerCase();
+        bv = (b.dataset[key] || '').toLowerCase();
+      }
+      if (av < bv) return dir === 'desc' ? 1 : -1;
+      if (av > bv) return dir === 'desc' ? -1 : 1;
+      return 0;
+    });
+    rows.forEach(function (r) { tbody.appendChild(r); });
+  }
+
+  function filterTable(table, query) {
+    var q = (query || '').toLowerCase().trim();
+    var rows = document.querySelectorAll('#' + TABLES[table] + ' tr');
+    rows.forEach(function (tr) {
+      var match = !q || tr.textContent.toLowerCase().indexOf(q) !== -1;
+      tr.classList.toggle('hidden', !match);
+    });
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.tab === tab);
+    });
+    document.getElementById('table-funding').style.display = tab === 'funding' ? '' : 'none';
+    document.getElementById('table-ma').style.display = tab === 'ma' ? '' : 'none';
+    document.getElementById('search-funding').style.display = tab === 'funding' ? '' : 'none';
+    document.getElementById('search-ma').style.display = tab === 'ma' ? '' : 'none';
+  }
+
+  document.querySelectorAll('.tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () { switchTab(btn.dataset.tab); });
+  });
+
+  document.querySelectorAll('th.sortable').forEach(function (th) {
+    th.addEventListener('click', function () {
+      var key = th.dataset.sort, table = th.dataset.table, cur = sortState[table];
+      if (cur.key === key) cur.dir = cur.dir === 'desc' ? 'asc' : 'desc';
+      else { cur.key = key; cur.dir = key === 'co' ? 'asc' : 'desc'; }
+      document.querySelectorAll('th.sortable[data-table="' + table + '"]').forEach(function (t) {
+        var active = t === th;
+        t.classList.toggle('sorted', active);
+        var arrow = t.querySelector('.arrow');
+        if (arrow) arrow.textContent = active ? (cur.dir === 'desc' ? '↓' : '↑') : '↕';
+      });
+      sortTable(table, key, cur.dir);
+    });
+  });
+
+  ['funding', 'ma'].forEach(function (table) {
+    var input = document.getElementById(SEARCH[table]);
+    if (!input) return;
+    input.addEventListener('input', function () { filterTable(table, input.value); });
+  });
+})();
+</script>
