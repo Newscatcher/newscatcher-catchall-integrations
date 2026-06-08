@@ -21,11 +21,19 @@ Usage:
 
 import json
 import os
+import sys
 import time
 from pathlib import Path
 
 import anthropic
 import httpx
+
+# Emit UTF-8 so the status emojis below don't raise UnicodeEncodeError on
+# consoles that default to a non-UTF-8 encoding (e.g. Windows cp1252).
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
 
 # Configuration
 CATCHALL_BASE_URL = "https://catchall.newscatcherapi.com"
