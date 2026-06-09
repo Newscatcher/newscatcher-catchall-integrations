@@ -10,15 +10,23 @@ Requirements:
 Usage:
     export CATCHALL_API_KEY="your_api_key"
     export ANTHROPIC_API_KEY="your_anthropic_key"
-    python claude_api_example.py
+    python claude_agent_example.py
 """
 
 import json
 import os
+import sys
 import time
 
 import anthropic
 import httpx
+
+# Emit UTF-8 so the status emojis below don't raise UnicodeEncodeError on
+# consoles that default to a non-UTF-8 encoding (e.g. Windows cp1252).
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
 
 # Configuration
 CATCHALL_BASE_URL = "https://catchall.newscatcherapi.com"
@@ -58,11 +66,11 @@ TOOLS = [
     {
         "name": "submit_query",
         "description": (
-            "Submit a natural language query to search the web. "
-            "The system will fetch, validate, cluster, and summarize relevant articles. "
+            "Submit a natural language query to the CatchAll API. "
+            "The system will fetch, validate, and enrich matching records. "
             "Returns a job_id. After submitting, wait 30 seconds before calling pull_results "
-            "for the first time - results stream in gradually as processing continues. "
-            "By default, limits results to 10 clusters. Set fetch_all=true only if the user "
+            "for the first time — results stream in gradually as processing continues. "
+            "By default, limits results to 10 records. Set fetch_all=true only if the user "
             "explicitly asks for ALL results (e.g., 'find all', 'get everything')."
         ),
         "input_schema": {
@@ -84,11 +92,12 @@ TOOLS = [
     {
         "name": "pull_results",
         "description": (
-            "Retrieve results for a job. Supports streaming - wait 30 seconds after submit_query, then call this. "
-            "Results appear gradually as processing continues. The response includes 'status' field - "
-            "if not 'completed', more results may be available later. Poll every 1 minute to get new results. "
-            "When you get results but status is not 'completed', show the user what's available so far "
-            "and let them know more results are coming. Returns clustered and summarized results."
+            "Retrieve validated, enriched records for a job. "
+            "Wait 30 seconds after submit_query, then call this. "
+            "Results stream in gradually as processing continues. The response includes a 'status' field — "
+            "if not 'completed', more records may be available later. Poll every 1 minute to get new records. "
+            "When you get records but status is not 'completed', show the user what's available so far "
+            "and let them know more results are coming."
         ),
         "input_schema": {
             "type": "object",
@@ -246,7 +255,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
         return f"Unexpected error: {str(e)}"
 
 
-def run_agent(user_message: str, model: str = "claude-sonnet-4-20250514") -> str:
+def run_agent(user_message: str, model: str = "claude-sonnet-4-5") -> str:
     """
     Run an agentic loop with Claude using CatchAll tools.
 
@@ -314,7 +323,7 @@ def run_agent(user_message: str, model: str = "claude-sonnet-4-20250514") -> str
                             result_data = json.loads(result)
                             steps = result_data.get("steps", [])
                             completed_steps = sum(1 for s in steps if s.get("completed"))
-                            total_steps = len(steps) if steps else 7  # Default to 7 if no steps
+                            total_steps = len(steps) if steps else 6
                             current_status = result_data.get("status", "unknown")
                             print(f"   📊 Progress: {completed_steps}/{total_steps} steps completed")
                             print(f"   📍 Current status: {current_status}")
@@ -344,13 +353,13 @@ def run_agent(user_message: str, model: str = "claude-sonnet-4-20250514") -> str
                             try:
                                 result_data = json.loads(result)
                                 status = result_data.get("status", "")
-                                clusters_count = len(result_data.get("clusters", []))
+                                records_count = len(result_data.get("all_records", []))
 
                                 if "completed" in status.lower():
-                                    print(f"   ✅ Job completed with {clusters_count} clusters")
+                                    print(f"   ✅ Job completed with {records_count} records")
                                     break
                                 else:
-                                    print(f"   📊 Got {clusters_count} clusters so far (status: {status})")
+                                    print(f"   📊 Got {records_count} records so far (status: {status})")
                                     print(f"   ⏳ Job still processing. Waiting 1 minute before next poll...")
                                     time.sleep(60)
                             except json.JSONDecodeError:
