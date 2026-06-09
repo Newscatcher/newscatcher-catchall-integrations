@@ -44,6 +44,7 @@ To install a skill with Claude, copy its folder into your project's `.claude/ski
 | Competitor Snapshot | Structured digest of a competitor's recent moves: product launches, pricing, leadership, M&A, partnerships | "Snapshot [company]", "what's [competitor] been up to", "competitive brief on [company]" | MCP + API fallback | [`skills/competitor-snapshot`](./skills/competitor-snapshot/) |
 | Fundraising | Confirmed funding announcements across any geography, stage, and industry | "Series B raises in Austin last 30 days", "AI startups that raised seed this month" | MCP | [`skills/fundraising`](./skills/fundraising/) |
 | Mergers & Acquisitions | Confirmed M&A deals — acquisitions, mergers, asset purchases, acqui-hires | "AI companies acquired in the US last 30 days", "fintech mergers this week" | MCP | [`skills/mergers-and-acquisitions`](./skills/mergers-and-acquisitions/) |
+| VC Pack | Combined funding + M&A intelligence: capital flowing into (rounds) and out of (acquisitions) a market in one dashboard | "VC pack for fintech", "funding and M&A in cybersecurity last 30 days", "capital activity in healthcare AI", "deal activity in defense tech", "where is money moving in climate" | MCP | [`skills/vc-pack`](./skills/vc-pack/) |
 
 > **For any contributor:** add a row to the table above each time a new skill is merged. Fill in all four columns. Keep the folder path relative so links stay valid after cloning.
 
@@ -96,6 +97,21 @@ Like the Fundraising skill, it operates on the event layer: queries describe rea
 Best for: competitive intelligence, deal sourcing, market monitoring, GTM targeting of recently-acquired companies.
 
 → [Read the skill documentation](./skills/mergers-and-acquisitions/SKILL.md)
+
+---
+
+### VC Pack
+**Folder:** `skills/vc-pack` · **Interface:** MCP (`https://catchall-mcp.newscatcherapi.com/mcp`)
+
+Produces a combined funding and M&A intelligence dashboard for any market, geography, and timeframe (up to 30 days). Tracks where capital flows *into* a sector (funding rounds) and *out of* it (acquisitions) in a single view — two parallel CatchAll jobs joined at the presentation layer.
+
+Output is a single HTML dashboard with aggregated signals: deal-stage breakdown, sub-sector distribution, capital ratio, top-3 deals by size, and mega-round percentage. The dashboard is never rendered partially — both feeds must complete before any output is shown.
+
+**Do not use for single-signal queries.** If the user asks only about funding rounds or only about acquisitions, use the `fundraising` or `mergers-and-acquisitions` skill instead.
+
+Best for: VCs tracking full capital activity, market intelligence teams, competitive analysts, anyone who needs the complete capital-flow picture for a sector.
+
+→ [Read the skill documentation](./skills/vc-pack/SKILL.md)
 
 ---
 
@@ -165,12 +181,13 @@ Each skill and integration is self-contained. Navigate to its folder and follow 
 ```
 newscatcher-catchall-integrations/
 ├── skills/
-│   ├── general-use-case/          # Core CatchAll API skill (submit → poll → pull, monitors)
+│   ├── general-use-case/          # Core CatchAll skill (submit → poll → pull, monitors, webhooks, datasets)
 │   ├── competitor-snapshot/       # Competitive intelligence skill
 │   ├── fundraising/               # Funding round tracking skill
-│   └── mergers-and-acquisitions/  # M&A deal tracking skill
+│   ├── mergers-and-acquisitions/  # M&A deal tracking skill
+│   └── vc-pack/                   # Combined funding + M&A dashboard skill
 ├── Claude/
-│   └── Claude Agent/              # Anthropic Claude API integration
+│   └── Claude Agent/              # Anthropic Claude API integration (basic + skill-based)
 ├── crew_ai/
 │   ├── deep_search_agent/         # Iterative research agent (CrewAI)
 │   └── risk_management_agent/     # Supply chain risk agent (CrewAI)

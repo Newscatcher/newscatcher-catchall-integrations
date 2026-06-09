@@ -4,7 +4,37 @@ All notable changes to this repository are documented here.
 
 ---
 
+## [2026-06-08]
+
+### Claude Agent — `Claude/Claude Agent`
+- **`claude_agent_skill_example.py`** — major overhaul:
+  - Fixed `SKILL_PATH`: `Claude/CatchAll-SKILL/SKILL.md` → `skills/general-use-case/SKILL.md`
+  - Deleted `parse_skill_to_tools()` entirely; replaced with a hardcoded `TOOLS` list covering all 11 job tools and monitor tools with proper JSON Schemas
+  - Fixed monitor endpoint: `POST /catchAll/monitors/create` → `POST /catchAll/monitors`
+  - Cleaned up `update_monitor`: removed inline webhook body, limit-only payload
+  - Updated model default: `claude-sonnet-4-20250514` → `claude-sonnet-4-5`
+  - Replaced bare `except:` with `except ValueError` / `except Exception`
+  - Preserved `system=skill_content` in `run_agent()` — the core differentiator from the non-skill variant
+- **`claude_agent_example.py`** — minor updates aligned with overhaul
+- **`README.md`** — rewritten to document both examples (`claude_agent_example.py` and `claude_agent_skill_example.py`), fix setup path (`Claude/Claude API` → `Claude/Claude Agent`), and expand Available Tools table with per-file breakdown
+
+---
+
 ## [2026-06-05]
+
+### New skill — `vc-pack`
+- Added `skills/vc-pack/` — combined funding + M&A intelligence skill
+- Submits two parallel CatchAll jobs (one fundraising, one M&A) and renders a single HTML dashboard with aggregates: deal-stage breakdown, sub-sector distribution, capital-ratio, top-3 deals, and mega-round percentage
+- Reference files: `references/EXTRACTION.md` (query construction, validators, enrichments for both feeds), `references/JOB-LIFECYCLE.md`, `references/NEXT-STEPS.md`
+- Assets: `assets/dashboard.html` (dashboard template) and `assets/render.py` (renderer)
+- Do not use for single-signal queries — `fundraising` or `mergers-and-acquisitions` skills handle those
+
+### Skills — `fundraising` and `mergers-and-acquisitions` (updated)
+- Both `SKILL.md` files updated to latest tested versions
+- New shared reference files added to each skill folder:
+  - `references/JOB-LIFECYCLE.md` — step-by-step job polling guide with timing recommendations
+  - `references/NEXT-STEPS.md` — post-delivery action menu (save results, set up monitor, export)
+  - `references/OUTPUT-ARTIFACTS.md` — full field-level output schema with descriptions and example values
 
 ### Skills — `general-use-case`
 - Applied skill-creator (Anthropic public skill) analysis to `skills/general-use-case/SKILL.md`
