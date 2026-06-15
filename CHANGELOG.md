@@ -4,6 +4,38 @@ All notable changes to this repository are documented here.
 
 ---
 
+## [2026-06-15]
+
+### Skills — folder renames (all use-case skills now have `-catchall` suffix)
+- `competitor-snapshot` → `competitor-snapshot-catchall`
+- `fundraising` → `fundraising-catchall`
+- `mergers-and-acquisitions` → `m&a-catchall`
+- `vc-pack` → `vc-pack-catchall`
+- Updated all skill `name:` frontmatter fields to match
+
+### Skills — all updated to latest tested versions
+- **Competitor Snapshot** — major `SKILL.md` rewrite; new reference docs: `CONCURRENCY.md`, `JOB-LIFECYCLE.md`, `NEXT-STEPS.md`, `OUTPUT-REPORT.md`, `QUERY-REVIEW.md`; updated `COMPANY-WATCHLIST.md`
+- **Fundraising** — updated `SKILL.md`, enhanced `JOB-LIFECYCLE.md`, new `OUTPUT-LIST.md` and `QUERY-REVIEW.md`, added `scripts/build_downloads.py`
+- **Mergers & Acquisitions** — same updates as Fundraising
+- **VC Pack** — major `SKILL.md` overhaul, new `CONCURRENCY.md`, enhanced `JOB-LIFECYCLE.md`, new `QUERY-REVIEW.md`, added `scripts/render.py`
+
+---
+
+## [2026-06-08]
+
+### Claude Agent — `claude_agent_skill_example.py` major refactor
+- **`SKILL_PATH` fixed** — was pointing to `Claude/CatchAll-SKILL/SKILL.md`; now correctly resolves to `skills/general-use-case/SKILL.md`
+- **`parse_skill_to_tools()` removed** — replaced with a hardcoded `TOOLS` list covering all 11 jobs + monitor tools with proper JSON Schemas; eliminates a dynamic parsing step that silently produced wrong schemas
+- **Monitor endpoint fixed** — `POST /catchAll/monitors/create` → `POST /catchAll/monitors`
+- **`update_monitor` cleaned up** — inline webhook removed from request body; now passes `limit` only
+- **Model default updated** — `claude-sonnet-4-20250514` → `claude-sonnet-4-5`
+- **Error handling** — bare `except:` replaced with `except ValueError` / `except Exception` throughout
+- **Windows compatibility** — UTF-8 stdout reconfiguration added so status emojis render correctly on cp1252 consoles
+- `system=skill_content` preserved in `run_agent()` — the core differentiator from the non-skill variant
+- `README.md` updated with corrected setup instructions and usage examples
+
+---
+
 ## [2026-06-05]
 
 ### Skills — `general-use-case`
@@ -13,6 +45,18 @@ All notable changes to this repository are documented here.
 - **`ed_score_min`** — documented entity confidence threshold parameter for watchlist mode with recommended values and when to lower it
 - **Full automation workflow** — new section with the complete 5-step sequence for "alert me weekly when X happens" requests (job → review → webhook → monitor → confirm); covers common trigger phrases like Slack alerts, weekly digests, competitor funding alerts
 - **Monitor debugging** — added edge case for "monitor returned 0 results after previously returning N"; guides agent to `get_monitor_status` and reference job re-evaluation
+
+### New skill — VC Pack (`skills/vc-pack-catchall/`)
+- Combines funding rounds and M&A acquisitions into a single market-intelligence dashboard
+- Runs two parallel CatchAll jobs (funding feed + M&A feed) and joins results at the presentation layer
+- Dashboard never renders partial — both feeds must complete before the HTML report is generated
+- Covers any market, geography, and timeframe up to 30 days
+- Included assets: `assets/dashboard.html` (output template), `assets/render.py` (rendering script)
+- Reference docs included: `EXTRACTION.md`, `JOB-LIFECYCLE.md`, `NEXT-STEPS.md`
+
+### Skills — Fundraising and Mergers & Acquisitions (reference docs expanded)
+- Added `JOB-LIFECYCLE.md`, `NEXT-STEPS.md`, and `OUTPUT-ARTIFACTS.md` to both skills
+- Minor copy fixes to frontmatter trigger phrases in both `SKILL.md` files
 
 ---
 
