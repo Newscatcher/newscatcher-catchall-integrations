@@ -32,7 +32,7 @@ The MCP server calls the REST API under the hood. The API is the source of truth
 
 ## Skills
 
-Skills are SKILL.md files that give Claude or any other Agent a specialized, task-specific capability on top of the CatchAll API or CatchAll MCP. Each skill knows how to write the right query, which validators to apply, and how to format the output for its specific use case.
+Skills are SKILL.md files that give Claude or any other Agent a specialized, task-specific capability on top of the CatchAll MCP. Each skill knows how to write the right query, which validators to apply, and how to format the output for its specific use case.
 
 To install a skill with Claude, copy its folder into your project's `.claude/skills/` directory or point Claude at it directly. Same goes with other Agents. You might require to create a .zip file reuniting multiple skill related files together.
 
@@ -41,7 +41,7 @@ To install a skill with Claude, copy its folder into your project's `.claude/ski
 | Skill | Use Case | Trigger Phrases | Interface | Folder |
 |---|---|---|---|---|
 | General Use Case | General-purpose CatchAll access: submit queries, poll jobs, pull results, monitors, webhooks, datasets, entities, projects | Any CatchAll task without a dedicated skill | MCP | [`skills/general-use-case`](./skills/general-use-case/) |
-| Competitor Snapshot | Structured digest of a competitor's recent moves: product launches, pricing, leadership, M&A, partnerships | "Snapshot [company]", "what's [competitor] been up to", "competitive brief on [company]" | MCP + API fallback | [`skills/competitor-snapshot-catchall`](./skills/competitor-snapshot-catchall/) |
+| Competitor Snapshot | Structured digest of a competitor's recent moves: product launches, pricing, leadership, M&A, partnerships | "Snapshot [company]", "what's [competitor] been up to", "competitive brief on [company]" | MCP| [`skills/competitor-snapshot-catchall`](./skills/competitor-snapshot-catchall/) |
 | Fundraising | Confirmed funding announcements across any geography, stage, and industry | "Series B raises in Austin last 30 days", "AI startups that raised seed this month" | MCP | [`skills/fundraising-catchall`](./skills/fundraising-catchall/) |
 | Mergers & Acquisitions | Confirmed M&A deals — acquisitions, mergers, asset purchases, acqui-hires | "AI companies acquired in the US last 30 days", "fintech mergers this week" | MCP | [`skills/m&a-catchall`](./skills/m&a-catchall/) |
 | VC Pack | Combined funding + M&A market intelligence dashboard — capital flowing into and out of a sector in one view | "VC pack for fintech", "funding and M&A in cybersecurity last 30 days", "capital activity in healthcare AI", "where is money moving in climate" | MCP | [`skills/vc-pack-catchall`](./skills/vc-pack-catchall/) |
