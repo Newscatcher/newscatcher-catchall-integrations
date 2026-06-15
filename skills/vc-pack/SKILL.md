@@ -17,25 +17,28 @@ out of it (acquisitions). Output is a single dashboard combining both
 feeds. Data comes from two parallel CatchAll jobs joined at the
 presentation layer.
 
-This skill is self-contained. Query construction, validators, and
-enrichments for both feeds are in `references/EXTRACTION.md`. The
-dashboard template and the render script are in `assets/`.
+Query construction, validators, and
+enrichments for both feeds are defined in § Building the two queries. The
+render script is in `scripts/`; the dashboard template it fills is in
+`assets/`.
 
 ---
 
-## CRITICAL: One dashboard, two feeds, no preview
+## CRITICAL: One dashboard, two feeds — the partial is a progress line, not the dashboard
 
 The VC pack always submits two jobs and renders one dashboard.
 
 - Never substitute one feed for the other.
-- Never render partial output. The dashboard's aggregates (deal stage %,
-  sub-sectors, capital ratio, top-3, mega-rounds %) are invalid until
-  both feeds report `status: completed`.
-- Never preview the dashboard with placeholder values while jobs are
-  still running.
+- **The DASHBOARD never renders partial.** Its aggregates (deal stage %,
+  sub-sectors, capital ratio, top-3, mega-rounds %) are invalid until both
+  feeds report `status: completed` — never preview it with placeholder values.
+- **Progress shows as the live table** in `references/CONCURRENCY.md` (both
+  feeds, with status + counts, updated as the run goes) — never the dashboard,
+  and never one feed's results dressed up as the whole. The full dashboard
+  renders only when both feeds complete.
 
-If only one feed completes, do not render the half-dashboard. Tell the
-user which feed failed and offer to retry that side.
+If a feed `failed` (not merely slow), tell the user which side failed and offer
+to retry it.
 
 ---
 
@@ -46,7 +49,9 @@ Required dimensions:
 2. **Location** — city, region, country, or "global." Defaults to global if unspecified.
 3. **Timeframe** — explicit window, max 30 days. Never open-ended.
 
-If any are missing, ask before submitting.
+If any are missing, ask before submitting (use the standard time-window
+question in `references/QUERY-REVIEW.md`, combined with the `Max results`
+picker in one step).
 
 | User input | Resolved request |
 |---|---|
@@ -59,34 +64,298 @@ into separate runs and reconciled by the user.
 
 ---
 
+## Building the two queries
+
+### CRITICAL: Never query for web pages
+
+Before constructing any query, run this self-check:
+
+**Does my query contain any of these forbidden phrases?**
+
+- `news articles`, `news stories`, `articles about`, `stories about`
+- `press coverage`, `media coverage`, `NLP summary`
+- `recent news`, `news on`, `coverage of`, `reports on`
+- `find articles`, `search articles`, `get articles`
+
+If yes -- **stop and rewrite**. The query must describe what happened in
+the world, not what was written about it.
+
+**Wrong:** `"news articles about Series B raises in Austin last 30 days"`
+**Right:** `"Series B funding rounds announced in Austin in the last 30 days"`
+
+**Wrong:** `"find articles covering AI company acquisitions last month"`
+**Right:** `"AI companies that announced an acquisition in the last 30 days"`
+
+Validators and enrichments must also be event-scoped. Never write
+`"web page mentions a funding round"` -- write `"a company has officially
+announced a closed funding round"`.
+
+### Constraint cap (applies to both feeds)
+
+Cap each query at 4 meaningful constraints. More than that and results
+will silently return nothing -- CatchAll can't match a 6-way
+intersection that rarely appears in a single source.
+
+Safe to include (commonly disclosed in announcements):
+- Event type (round stage, deal type)
+- Industry / market
+- Location
+- Timeframe
+- Amount threshold ("over $10M", "under $1B")
+
+Avoid (rarely in source articles):
+- Investor tier / fund size
+- Founder demographics
+- Acquirer AUM
+- Founding year
+- Headcount
+
+### Funding job
+
+#### Query formula
+
+`"<event verb> + <stage if specified> + <industry/market> + <location> + <timeframe>"`
+
+Use natural language. CatchAll interprets it -- don't reduce to keywords.
+
+| User intent | Query |
+|---|---|
+| AI agents funding last 7 days | `"funding rounds announced by AI agent startups in the last 7 days"` |
+| Cybersecurity US last 30 days | `"funding rounds announced by cybersecurity companies in the United States in the last 30 days"` |
+| Series B fintech Europe | `"Series B funding rounds announced by fintech companies in Europe in the last 30 days"` |
+
+#### Query signal terms (include at least one)
+
+`raised, secures funding, closes round, announces investment, seed round,
+Series A, Series B, funding announcement, backed by, led by`
+
+#### Valid funding events
+
+- Officially announced closed/completed round
+- Confirmed by the company, named investor, or credible source
+- Amount or stage publicly disclosed
+
+#### Excluded
+
+Rumors, funding targets, government grants, IPOs, SPACs, debt financing.
+
+#### Validators
+
+```json
+[
+  {
+    "name": "is_funding_announcement",
+    "description": "True only if the event reports a company that has officially announced a closed or completed funding round, confirmed by the company, a named investor, or a credible source. False for rumors, funding targets, grants, IPOs, or debt financing.",
+    "type": "boolean"
+  },
+  {
+    "name": "location_match",
+    "description": "True if the company is headquartered in or primarily operating from the specified geographic area. If no location was specified, set to true for all results.",
+    "type": "boolean"
+  },
+  {
+    "name": "event_in_timeframe",
+    "description": "True if the funding announcement was made or confirmed within the requested time window. False if the date is unconfirmed or outside the window.",
+    "type": "boolean"
+  },
+  {
+    "name": "stage_match",
+    "description": "True if the funding round matches the requested stage or stage range. If no stage was specified, set to true for all results.",
+    "type": "boolean"
+  }
+]
+```
+
+#### Enrichments
+
+Required for the VC pack dashboard:
+
+```json
+[
+  { "name": "company_name", "description": "Name of the company that raised funding", "type": "text" },
+  { "name": "company_domain", "description": "Company website domain if available", "type": "text" },
+
+  { "name": "funding_round", "description": "Original stage label as reported (e.g. Series B2, Seed Extension)", "type": "text" },
+  { "name": "funding_stage_normalized", "description": "Normalized stage: pre-seed, seed, series_a, series_b, series_c, growth, unknown", "type": "text" },
+
+  { "name": "funding_amount_value", "description": "Numeric value of funding amount only (e.g. 5000000)", "type": "number" },
+  { "name": "funding_amount_currency", "description": "Currency of funding amount (USD, EUR, GBP, etc.)", "type": "text" },
+  { "name": "funding_amount_display", "description": "Formatted funding amount for display (e.g. $5M, €3.2M, Undisclosed)", "type": "text" },
+
+  { "name": "announcement_date", "description": "Date the funding round was officially announced or confirmed", "type": "date" },
+
+  { "name": "product_description", "description": "One-sentence description of what the company does or makes, extracted from the funding announcement. Focus on the core product or service, not the funding round itself. Example: 'AI-powered code editor for software developers' or 'B2B fintech platform for SMB lending'.", "type": "text" },
+
+  { "name": "investors", "description": "Named lead investors or participating firms, if disclosed. Return as a list or comma-separated string.", "type": "text" },
+  { "name": "company_location", "description": "City, region, or country where the company is headquartered", "type": "text" },
+  { "name": "industry_vertical", "description": "Specific industry sub-vertical of the company (e.g. 'identity', 'fraud', 'threat-intel', 'fintech', 'AI infrastructure', 'humanoid robots'), not an umbrella term ('cybersecurity', 'robotics'). One short lowercase phrase, plural preferred. No comma-joined lists.", "type": "text" }
+]
+```
+
+`industry_vertical` powers the **Sub-sectors by deal count** card. Prefer
+specific labels (e.g. "identity", "SOC/SecOps") over umbrella terms
+(e.g. "cybersecurity") because the sub-sector card aggregates within a
+market, not across markets.
+
+`funding_stage_normalized` powers the **Deal stage** card. Must use the
+exact enum values listed.
+
+`investors` powers the **Most active investors** card and the table's
+"Select investors" column.
+
+#### Source URL
+
+Use `citations[0].link` from the underlying record. Not in the
+enrichment schema -- the citations list is populated by clustering, not
+LLM extraction.
+
+### M&A job
+
+#### Query formula
+
+`"<target description> + <event verb> + <location> + <timeframe>"`
+
+| User intent | Query |
+|---|---|
+| AI agents M&A last 7 days | `"AI agent companies that were acquired in the last 7 days"` |
+| Cybersecurity US last 30 days | `"cybersecurity companies that were acquired or merged in the United States in the last 30 days"` |
+| Healthcare AI Europe | `"healthcare AI companies that announced an acquisition in Europe in the last 30 days"` |
+
+#### Query signal terms (include at least one)
+
+`acquires, acquired by, merges with, merger, takeover, asset purchase,
+buys, deal closed, acquisition announced, acqui-hire, combines with`
+
+#### Valid M&A events
+
+- Officially announced acquisition, merger, asset purchase, or acqui-hire
+- Confirmed ownership transfer or merger announcement
+
+#### Excluded
+
+Rumors, partnerships without ownership transfer, funding rounds, IPOs,
+licensing deals, minority stakes.
+
+#### Validators
+
+```json
+[
+  {
+    "name": "is_ma_event",
+    "description": "True only if the event reports a confirmed merger, acquisition, asset purchase, or acqui-hire. False for rumors, partnerships, funding rounds, IPOs, or licensing deals.",
+    "type": "boolean"
+  },
+  {
+    "name": "location_match",
+    "description": "True if either the acquirer or target is headquartered in or primarily operating from the specified geographic area. If no location was specified, set to true for all results.",
+    "type": "boolean"
+  },
+  {
+    "name": "event_in_timeframe",
+    "description": "True if the deal announcement was made or confirmed within the requested time window. False if the date is unconfirmed or outside the window.",
+    "type": "boolean"
+  },
+  {
+    "name": "industry_match",
+    "description": "True if the target's industry/vertical matches the requested market. If no market was specified, set to true for all results.",
+    "type": "boolean"
+  }
+]
+```
+
+#### Enrichments
+
+Required for the VC pack dashboard:
+
+```json
+[
+  { "name": "acquirer_name", "description": "Name of the company making the acquisition or initiating the merger", "type": "text" },
+  { "name": "acquirer_domain", "description": "Acquirer website domain if available", "type": "text" },
+  { "name": "acquirer_location", "description": "City, region, or country where the acquirer is headquartered", "type": "text" },
+
+  { "name": "acquirer_type", "description": "Categorize the acquirer using the standard M&A taxonomy. Output value MUST be exactly one of these four literal strings, with no additional text, qualifiers, or parentheticals: 'big_tech', 'strategic', 'financial', or 'other'. Definitions: 'big_tech' = one of Amazon, Microsoft, Google/Alphabet, Apple, Meta, NVIDIA, Anthropic, OpenAI, or a subsidiary thereof (DeepMind, AWS, etc.); 'strategic' = any other operating company acquirer (regardless of size, vertical adjacency, or public/private status); 'financial' = PE firm, holding company, family office, search fund, or other financial sponsor; 'other' = ambiguous, unknown, or doesn't fit the above (e.g. government, non-profit, individual). Pick the single best fit and return only the bare label.", "type": "text" },
+
+  { "name": "target_name", "description": "Name of the company being acquired or merging", "type": "text" },
+  { "name": "target_domain", "description": "Target company website domain if available", "type": "text" },
+  { "name": "target_location", "description": "City, region, or country where the target is headquartered", "type": "text" },
+  { "name": "target_industry", "description": "Specific industry sub-vertical of the target company (e.g. 'identity', 'fraud', 'fintech', 'humanoid robots'). One short lowercase phrase, plural preferred. No umbrella terms, no comma-joined lists.", "type": "text" },
+
+  { "name": "deal_type_raw", "description": "Event type as originally reported (e.g. 'acquires', 'merges with', 'buys assets of')", "type": "text" },
+  { "name": "deal_type_normalized", "description": "Normalized event type: acquisition, merger, asset_purchase, acqui_hire, unknown", "type": "text" },
+  { "name": "deal_type_display", "description": "Formatted event type for UI display (e.g. Acquisition, Merger, Asset Purchase, Acqui-hire)", "type": "text" },
+
+  { "name": "deal_value_value", "description": "Numeric value of deal amount if disclosed (e.g. 500000000)", "type": "number" },
+  { "name": "deal_value_currency", "description": "Currency of deal value (USD, EUR, GBP, etc.)", "type": "text" },
+  { "name": "deal_value_display", "description": "Formatted deal value for UI display (e.g. $500M, Undisclosed)", "type": "text" },
+
+  { "name": "announcement_date", "description": "Date the deal was officially announced", "type": "date" }
+]
+```
+
+`acquirer_type` powers the **Acquirer type** card and the table's buyer
+chip. Must use the exact enum values listed -- do not invent new labels.
+
+`target_industry` is used as the table row subtitle.
+
+#### Source URL
+
+Same pattern as funding -- use `citations[0].link` from the underlying
+record.
+
+### No-results escalation
+
+If either feed returns zero or near-zero records, before re-running with
+broader scope, surface this to the user with the actual numbers:
+
+> "Funding feed returned N records, M&A feed returned M records. Want
+> me to widen the search?"
+
+Then escalate in steps:
+
+1. **Drop excess constraints.** If the original query has 5+
+   constraints, drop the most restrictive one first.
+2. **Widen the timeframe** (within the 30-day ceiling).
+3. **Widen the geography**: city → region → country → continent → global.
+4. **Broaden the market label** (e.g. "AI agents" → "AI startups").
+5. **Advise honestly:** if all four steps have been tried, the
+   combination may not have coverage in the available sources.
+
+Never silently broaden a query without telling the user what changed.
+
+---
+
 ## Submit two jobs in parallel
+
+**Show the `Max results` picker first — before running pre-flight or building
+the queries.** Once the request has a market + timeframe
+(≤ 30 days), render it (ask for a missing timeframe in the same step); skip only
+if the user already named a number:
+
+- **Header:** `Max results`
+- **Question:** `How many results at most? Limits the number of validated results returned per search.`
+- **Options** — labels only, **empty** descriptions (`""`): **`50 (Recommended)`**, `10`, `100`, `All`
+
+**Then, after they pick,** read the references and run — everything else silent
+(tool calls only, no prose; see JOB-LIFECYCLE "No narrating the machinery"). The
+chosen number is the per-feed `limit`.
 
 Submit both jobs in the same turn. Order doesn't matter; wall-clock time
 is shared across the two.
 
-Before constructing queries, read `references/EXTRACTION.md` for the
-forbidden-phrase rules, query formulas, validators, and enrichments. Both
-feeds must use their full validator + enrichment schemas as specified.
+Build both queries per § Building the two queries — both feeds use their
+full validator + enrichment schemas as specified there.
 
-**Funding query** — formula in EXTRACTION.md ("Funding job"). Required
-enrichments: `industry_vertical` (Sub-sectors), `funding_stage_normalized`
-(Deal stage), `funding_amount_value`, `funding_amount_currency`,
-`investors`, `product_description`, `announcement_date`.
+**Limit:** ask how many via the picker in `references/JOB-LIFECYCLE.md`
+("How many results"), then apply the chosen number as the `limit` on **each
+feed** (default 50; "All" = exhaustive).
 
-**M&A query** — formula in EXTRACTION.md ("M&A job"). Required enrichments:
-`acquirer_type` (Acquirer type), `target_industry`, `deal_value_value`,
-`deal_value_currency`, `deal_value_display`, `deal_type_display`,
-`announcement_date`.
-
-**Limit:** `limit: 50` on each job unless the user explicitly asks for an
-exhaustive run. 50 is enough for a 30-day market view and bounds runtime.
-
-After both submits return, output one sentence:
+After both submits return, output one sentence — your opening line, then go
+quiet (no per-check chatter):
 
 ```
-I'll pull together a VC pack for <market> over the last <N> days —
-checking on both searches now; I'll render the dashboard once they're
-done.
+I'll pull together a VC pack for <market> over the last <N> days — checking
+both searches now. I'll show a first read as soon as one side has results,
+then the full dashboard once both are done. You don't need to wait here.
 ```
 
 ---
@@ -94,74 +363,56 @@ done.
 ## Run both jobs to completion
 
 Poll BOTH feeds to completion — do NOT hand off after a single check. The
-per-job rules are the same as every CatchAll skill (`references/JOB-LIFECYCLE.md`):
-sleep-safe pacing, stop only at a terminal status, a ~90-min cap. Do NOT
-burn the tool-call budget on chained `sleep` calls upfront.
+per-job rules are in `references/JOB-LIFECYCLE.md` (poll one timer then yield,
+stop only at a terminal status, the date pre-flight); the multi-job rules — the
+concurrency limit and the run-level cap — are in `references/CONCURRENCY.md`.
+Read both. Do NOT burn the tool-call budget on chained `sleep` calls upfront.
 
-1. **Poll both feeds** with `get_job_status` (one call per feed) every
-   ~60–90s. Pace each wait with a SINGLE background timer
-   (`run_in_background`) — never a foreground `sleep`, never overlapping
-   timers. A feed is done at `completed` or `failed`; `submitted` /
-   `analyzing` / `fetching` / `clustering` / `enriching` all mean still
-   running.
-2. **Both feeds `completed`** → render the full dashboard (see "Hand the
-   data to render.py" + "Render channels"). This is the normal path.
-3. **Either feed `failed`** → tell the user which side failed and stop.
-4. **If funding is done but M&A is still running** — after a reasonable
-   wait (~20–30 min, the normal completion window) or at the 90-min cap —
-   render the **funding side now** instead of making the user wait. Call
-   `render.py` with
-   `--funding-job-id <id>` plus `--ma-pending` (it renders funding fully and
-   marks the M&A + capital cards "still searching"). Keep both `job_id`s and
-   tell the user: *"Funding's ready — M&A is still searching; reply 'refresh'
-   and I'll complete the dashboard."*
-5. **On user follow-up** ("refresh" / "any update?") → re-check the pending
-   feed. If now `completed`, re-render the full dashboard from both job IDs.
-   If still running, do one more capped wait.
-
-(If funding is the slow one, the same applies in reverse — but funding is
-usually the faster feed.)
+1. **Check the concurrency limit first** (`get_user_limits` →
+   `Jobs_Concurrency`). If it's ≥2, submit both feeds at once; if it's 1,
+   submit funding, let it reach terminal, then submit M&A.
+2. **Poll both feeds** with `get_job_status` (one call per feed). Pace each
+   wait with a SINGLE background timer (`run_in_background`) — never a
+   foreground `sleep`, never overlapping timers. A feed is done at `completed`
+   or `failed`; every other status means still running.
+3. **Show the live progress table** (per `references/CONCURRENCY.md`) — both
+   feeds at T=0 (🔄 Running), updated with counts at the checkpoints. Counts
+   only, never the dashboard.
+4. **Both feeds `completed`** → render the full dashboard (see "Hand the data
+   to render.py" + "Render channels"). This is the normal path.
+5. **Either feed `failed`** → tell the user which side failed and stop.
+6. **If funding is done but M&A is still running** — after a reasonable wait
+   (~20–30 min more) — render the **funding side now** instead
+   of making the user wait. Pull funding via the MCP and hand it to `render.py`
+   with `--ma-pending` so the M&A + capital cards read "still searching." Keep
+   both `job_id`s and tell the user: *"Funding's ready — M&A is still searching;
+   reply 'refresh' and I'll complete the dashboard."* (Funding is usually the
+   faster feed; if M&A somehow finishes first, just wait funding out.)
+7. **On user follow-up** ("refresh" / "any update?") → re-check the pending
+   feed. If now `completed`, re-render the full dashboard. If still running, do
+   one more capped wait.
 
 ---
 
 ## CRITICAL: Hand the data to render.py — do NOT re-emit it via tokens
 
-Once both jobs report `completed`, your job is to invoke `render.py`
-with the two **job IDs**, not to pull the data and re-write it as JSON.
-Re-emitting tens of thousands of records as JSON via the LLM is exactly
-the bottleneck this design avoids.
+Once both jobs report `completed`, pull each feed via the MCP (`pull_results`)
+and hand the data to `render.py` as a **file** — never compute aggregates or
+re-write records inline. render.py does all the aggregation; re-emitting
+records through the LLM is the bottleneck to avoid.
 
-There are three input modes, in priority order. Use the first one that
-works in your environment.
+**There is no API-key / direct-HTTP path** — the records always come through
+the MCP, so the skill runs identically on claude.ai and Claude Code. Two ways
+to get the pulled data to render.py; use the first that applies.
 
-### Mode 1 — Direct API pull (PREFERRED)
+### Preferred — saved pull files (no re-emit)
 
-If `CATCHALL_API_KEY` is set in the environment (or you can pass
-`--api-key`), render.py pulls the data over HTTP itself. You emit only
-the two job IDs and the meta — sub-second, no tokens spent on data:
-
-```bash
-python /path/to/skill/assets/render.py \
-  --funding-job-id <funding_job_id> \
-  --ma-job-id <ma_job_id> \
-  --market "Cybersecurity" \
-  --location "United States" \
-  --window-days 30 \
-  --output /tmp/vc-pack-dashboard.html
-```
-
-Use this whenever it's available. The agent does NOT need to call
-`pull_results` at all — render.py does the pulling.
-
-### Mode 2 — Saved pull files
-
-If your environment automatically saves large MCP responses to disk
-(some Claude environments do this for tool outputs above a token limit),
-pass the saved file paths directly. render.py auto-unwraps the standard
-MCP `{"result": "<inner JSON>"}` envelope:
+If your host auto-saves large MCP tool results to disk (some do for outputs
+above a token limit), pass those file paths straight in — nothing is re-typed.
+render.py auto-unwraps the standard MCP `{"result": "<inner JSON>"}` envelope:
 
 ```bash
-python /path/to/skill/assets/render.py \
+python /path/to/skill/scripts/render.py \
   --funding-pull /path/to/funding-pull-result.txt \
   --ma-pull /path/to/ma-pull-result.txt \
   --market "Cybersecurity" --location "United States" \
@@ -169,25 +420,20 @@ python /path/to/skill/assets/render.py \
   --output /tmp/vc-pack-dashboard.html
 ```
 
-Use this when Mode 1 isn't available but the pull tool's output landed
-on disk via the harness's auto-save behavior.
+### Otherwise — write a compact input.json
 
-### Mode 3 — Combined input.json (LAST RESORT)
-
-Only use this when neither Mode 1 nor Mode 2 works (Claude.ai today is
-the canonical case: MCP credentials don't reach the code-execution
-sandbox, and the harness doesn't auto-save MCP results to disk). This
-mode requires writing the records to a file via Claude's file-write
-tool, which re-emits everything through token generation. The bytes
-Claude has to type ARE the wait time, so write the **minimal** shape:
+If the pulls didn't land on disk (claude.ai is the canonical case — MCP results
+stay in the model's context), write both feeds into one **compact, single-line
+JSON** file (the minimal schema below) and pass it. The bytes you type ARE the
+wait time, so write the minimal shape and nothing else:
 
 ```bash
-python /path/to/skill/assets/render.py \
+python /path/to/skill/scripts/render.py \
   /tmp/vc-pack-input.json \
   --output /tmp/vc-pack-dashboard.html
 ```
 
-#### Minimal Mode-3 schema — write ONLY these fields
+#### Minimal input.json schema — write ONLY these fields
 
 render.py reads a fixed, small set of fields. Drop everything else. In
 particular: no `record_id`, no `enrichment_confidence`, no `_domain`
@@ -261,7 +507,7 @@ M&A record (each entry in `ma_pull.all_records`):
 ```
 
 That is the EXHAUSTIVE list of fields render.py reads. Anything else in
-the raw CatchAll response is dead weight in Mode 3 — strip it. Citations
+the raw CatchAll response is dead weight here — strip it. Citations
 beyond `citations[0].link` are not used; cut them.
 
 Do not pretty-print the JSON. Compact form (no indentation, single line
@@ -279,7 +525,7 @@ do not compute aggregates in chat tokens.
 ## Dataset downloads (xlsx / JSON / CSV)
 
 The dashboard is the visual; the downloadable dataset is the structured
-proof, and it makes vc-pack match the other CatchAll skills. On the render.py
+data. On the render.py
 call, also pass **`--data-out <prefix>`** — it writes `<prefix>.json`,
 `.csv`, and `.xlsx` (the funding + M&A records) alongside the HTML, with no
 change to the dashboard. Use `<prefix>` = `<cwd>/<market-slug>-vc-pack`
@@ -309,70 +555,43 @@ empty M&A set and `meta.ma_pending: true` — refresh regenerates them.
 The dashboard is the deliverable in every environment. Pick the best
 channel available and fall through if a tier fails.
 
-All examples below use Mode 1 (direct-pull). Substitute Mode 2 / Mode 3
-flags if Mode 1 isn't available.
+The examples below use `<INPUT>` for the render.py input — substitute the
+saved-pull flags (`--funding-pull`/`--ma-pull`) or the compact `input.json`
+from "Hand the data to render.py" above.
 
-### Pre-flight — render to file first, then pick a tier by size
-
-`show_widget` has an undocumented size ceiling — large dashboards
-(roughly >50 KB minified, which corresponds to ~30-day windows with 40+
-total deals) reliably time out. Trying it anyway and falling back wastes
-30–90 s on the timeout. Avoid that by always rendering to a file first
-and using the file size to pick the tier:
+### Render once, then surface by environment — never shrink to fit
 
 ```bash
 OUT=/tmp/vc-pack-dashboard.html
-DATA="$PWD/cybersecurity-vc-pack"   # <market-slug>-vc-pack in the working dir
-python /path/to/skill/assets/render.py \
-  --funding-job-id <funding_job_id> \
-  --ma-job-id <ma_job_id> \
-  --market "Cybersecurity" --location "United States" --window-days 30 \
-  --data-out "$DATA" \
-  --output "$OUT"
-SIZE=$(wc -c < "$OUT")
+DATA="$PWD/<market-slug>-vc-pack"
+python /path/to/skill/scripts/render.py <INPUT> \
+  --market "<Market>" --location "<Location>" --window-days <N> \
+  --data-out "$DATA" --output "$OUT"
 ```
 
-Then:
+**Never shrink the dashboard or drop rows to fit a size limit** — render the
+full thing, then deliver `$OUT` by environment.
 
-- If `visualize:show_widget` is available **AND** `$SIZE < 50000` → Tier 1
-- Else if filesystem write to a user-visible location is available → Tier 2
-- Else → Tier 3 (re-render with `--format markdown`)
+### Side panel — when `/mnt/user-data/outputs/` is writable (claude.ai-style)
 
-This pattern costs one extra `wc -c` but eliminates the show_widget
-timeout penalty entirely on large windows.
+Move `$OUT` into `/mnt/user-data/outputs/` **after** the data files (so the
+dashboard is the most-recent file and the one the host surfaces first — the CSV
+otherwise grabs the side panel). Present it as a **side-panel artifact** (right
+side) — the full dashboard, no inline size ceiling. **Do not re-emit the HTML by hand or push it through an
+inline widget** — inline widgets cap size and force a lossy shrink-to-fit.
+Present the *file* render.py wrote. Then a clean header + an **honest**
+pointer (never "ready above" when it isn't):
 
-### Tier 1 — inline widget (Claude.ai, smaller HTML only)
+> **VC PACK** — <Market>
+> funding + M&A · last <N> days
+>
+> Dashboard's open in the side panel → (file: `<name>.html`)
 
-**Detect:** `visualize:show_widget` tool is available **and** rendered
-HTML is under 50 KB (per the pre-flight check above).
+### Browser — when a shell can `open`/`xdg-open` a file (Claude Code / IDEs)
 
-**Render:** read the already-written file and pass to `show_widget`:
-
-```bash
-# $OUT is already populated from the pre-flight render
-HTML=$(cat "$OUT")
-```
-
-Then pass `$HTML` to `show_widget` as `widget_code`.
-
-If `show_widget` still returns "No result received" or times out anyway,
-retry once more (2 attempts total). The file is on disk — retry is one
-more tool call. After 2 failures, **fall through to Tier 2**, do not
-error. Do not retry beyond 2 attempts; the size check made any further
-retry unlikely to succeed.
-
-### Tier 2 — file delivery (large dashboards or no widget tool)
-
-**Detect:** Tier 1 unavailable OR the rendered HTML is too big for the
-inline widget (the pre-flight check decided this).
-
-**Render:** the file is already on disk from the pre-flight render. Move
-it to a user-visible location and either auto-open it (Claude Code,
-Cursor, IDEs) or use whatever file-presentation tool the host exposes
-(`present_files`, etc.):
+`$OUT` is on disk — move it somewhere stable and auto-open it:
 
 ```bash
-# On Claude Code / Cursor / desktop IDEs — auto-open in browser:
 DIR="$HOME/.cache/vc-pack"          # %LOCALAPPDATA%\vc-pack on Windows
 mkdir -p "$DIR"
 TS=$(date +%Y%m%d-%H%M%S)
@@ -380,13 +599,6 @@ DEST="$DIR/dashboard-$TS.html"
 mv "$OUT" "$DEST"
 open "$DEST" 2>/dev/null || xdg-open "$DEST" 2>/dev/null || start "$DEST" 2>/dev/null
 echo "$DEST"
-
-# On Claude.ai (no shell `open`) — move to outputs and let the host present it:
-mkdir -p /mnt/user-data/outputs
-DEST=/mnt/user-data/outputs/vc-pack-dashboard-$(date +%Y%m%d-%H%M%S).html
-mv "$OUT" "$DEST"
-# Then call present_files (or whatever file-presentation tool is exposed)
-# with the path "$DEST".
 ```
 
 Print to chat — a clean two-line header (no figlet), then the dashboard's
@@ -412,35 +624,34 @@ The dashboard just opened in your browser — reopen it anytime:
 The HTML is self-contained (inline CSS + JS, no `fetch()`), so `file://`
 works fine. No server lifecycle, no port collisions.
 
-### Tier 3 — markdown (text-only environments)
+### Text-only host — markdown
 
-**Detect:** Tier 1 and 2 both unavailable.
-
-**Render:** re-run render.py with `--format markdown` (or, if the HTML
-file from the pre-flight render is still around, just discard it):
+Neither the side panel nor a browser is available. Re-run render.py with
+`--format markdown` (or discard the HTML file if it's already rendered):
 
 ```bash
-python /path/to/skill/assets/render.py \
-  --funding-job-id <funding_job_id> \
-  --ma-job-id <ma_job_id> \
+python /path/to/skill/scripts/render.py <INPUT> \
   --market "Cybersecurity" --location "United States" --window-days 30 \
   --format markdown
 ```
 
 Emits KPI lines, funding + M&A tables, and a one-line capital flow
-summary. Same data, no charts. This is a fallback so the skill doesn't
-dead-end — not a feature.
+summary. Same data, no charts.
 
-### Channel selection in code
+### Channel selection — detect by capability, NOT by app name
+
+You often **can't reliably tell claude.ai from Claude Code**, so don't try to —
+check what's *available* instead:
 
 ```
-1. If `visualize:show_widget` exists                       → Tier 1
-2. Else if bash + filesystem write to user's home          → Tier 2
-3. Else                                                    → Tier 3
-
-If a tier fails at runtime, drop to the next tier. The user wants the
-dashboard, not a status report on render plumbing.
+/mnt/user-data/outputs/ is writable     → side-panel artifact (move $OUT there)
+else `open`/`xdg-open` works in a shell  → browser
+else                                     → markdown (--format markdown)
 ```
+
+Test the capability (does the outputs dir exist? does `open` succeed?), take that
+branch, fall to the next if it fails. Never shrink the dashboard to fit — the
+user wants the dashboard, not a status report on render plumbing.
 
 ---
 
@@ -449,9 +660,8 @@ dashboard, not a status report on render plumbing.
 - The dashboard is the output. One sentence preamble (or none), render,
   stop.
 - **Never web-search, `WebFetch`, verify, dedupe, or re-judge the records.**
-  The dashboard renders CatchAll's raw output as-is — this is a demo of the
-  product, not an analysis of it. If a record looks off, that's CatchAll's
-  product domain, not something to audit here.
+  The dashboard renders CatchAll's raw output as-is. If a record looks off,
+  that's CatchAll's product domain, not something to audit here.
 - Do not narrate polling, FX fetching, or render mechanics. The
   dashboard's run-stats strip and FX footer surface what users need to
   know about provenance.
@@ -459,21 +669,11 @@ dashboard, not a status report on render plumbing.
   strictness, or query tightness. Wide pool with small `dealsFound`
   count is normal CatchAll behavior.
 - Do not suggest narrower queries unless the user asks.
-- Flag in chat only on real failures: feed status `failed`, zero deals
-  found in either feed, or unresolved FX after a `retry`.
+- Flag in chat only on real failures: feed status `failed`, or zero deals
+  found in either feed.
 - No Word doc, PDF, or spreadsheet alongside the dashboard unless the
   user asks.
 - End the chat output (after the dashboard) with the **More with CatchAll**
-  footer from `references/NEXT-STEPS.md`, rendered verbatim as the last line.
+  footer from `references/NEXT-STEPS.md` — re-read that file before writing
+  the last line, and copy the footer exactly.
 
-### "retry" resume after FX failure
-
-If render.py emits the dashboard in USD-only mode (FX endpoint failed
-with mixed-currency data), the footer says:
-
-> FX unavailable — N non-USD deals excluded from totals. Reply 'retry'
-> to retry conversion.
-
-When the user replies "retry," re-run render.py only (no need to
-re-pull CatchAll). It re-attempts the FX fetch and re-aggregates.
-Sub-30s round trip.

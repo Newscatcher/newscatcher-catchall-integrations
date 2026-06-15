@@ -1,5 +1,5 @@
 ---
-name: competitor-snapshot-catchall
+name: competitor-snapshot
 description: Use this skill whenever the user wants to understand what a competitor or peer company has been doing recently, whether for competitive intelligence, market positioning, sales enablement, product strategy, board prep, or general "what's going on at [competitor]" research. Triggers on phrases like "snapshot [company]", "what's [competitor] been up to", "give me a competitive update on [company]", "what's new at [competitor]", "track [competitor]", "competitive brief on [company]", "what are [list of competitors] doing". Use this skill for any single-company or multi-company competitive intelligence request that needs a structured digest of recent moves rather than just a list of links. Do not substitute generic web search.
 ---
 
@@ -18,23 +18,26 @@ The user wants to know what a competitor has been doing. Triggers:
 - "Competitive brief on [company]"
 - "Track [list of companies] for the last [period]"
 
-Common buyer personas: CI analysts, product managers, sales enablement, founders doing market scans, board prep, consultants.
-
 ## Inputs to confirm before running
 
-Follow `references/1-QUERY-REVIEW.md` for the general intake rules.
+Follow `references/QUERY-REVIEW.md` for the general intake rules.
 Skill-specific specifics:
 
 1. **Competitor(s)** (required) — accepted in two forms:
    - **Text-named**: one or more company names in the user's message (e.g., "Atlassian", "Atlassian, Apple, ServiceNow").
    - **Uploaded CSV/spreadsheet**: a file with at minimum a `name` column. `domain` is strongly preferred — see watchlist mode flow below for how to handle missing domains.
-2. **Time window** — ask if not specified; on an explicit waiver, the standard waive-off default applies (`references/1-QUERY-REVIEW.md` — last 7 days).
-3. **Specific angle** (optional) — if the user flags a focus area ("just want product moves"), prioritize that bucket.
+2. **Time window** — ask if not specified; on an explicit waiver, the standard waive-off default applies (`references/QUERY-REVIEW.md` — last 7 days).
+3. **Max results** — ask via the picker, combined with the time-window
+   question in the same step; skip if the user already named a number.
+   Header: `Max results`. Question: `How many results at most? Limits the
+   number of validated results returned per search.` Options — labels only,
+   empty descriptions, in this order: **`50 (Recommended)`**, `10`, `100`,
+   `All`. The chosen number is each search's `limit`.
+4. **Specific angle** (optional) — if the user flags a focus area ("just want product moves"), prioritize that bucket.
 
 Special-case rules:
-- **List of 101+ companies**: tell the user the skill caps at 100, ask whether to proceed with the first 100, and point them to the CatchAll platform + Book a demo links (see `references/4-NEXT-STEPS.md`) for larger lists.
+- **List of 101+ companies**: tell the user the skill caps at 100, ask whether to proceed with the first 100, and point them to the CatchAll platform + Book a demo links (see `references/NEXT-STEPS.md`) for larger lists.
 - **Ambiguous name**: if a competitor name could refer to multiple things (e.g., "Apple" → Apple Inc. or Apple Corps), ask one clarifying question before submitting.
-- **Cost gate**: per `1-QUERY-REVIEW.md`, confirm scope if estimated credits > 25% of remaining monthly allowance. Note: watchlist-mode runs cost roughly the same as single-competitor runs in Base mode (per-record billing), so this gate rarely triggers for company-count reasons alone.
 
 ## How the skill runs
 
@@ -43,21 +46,21 @@ a single competitor. A single-competitor run builds a watchlist of 1
 behind the scenes ({name: <competitor>, domain: <domain>}, no user
 prompt for the upload). This means every event carries `ed_score`,
 `relation`, and `is_developing` regardless of how many competitors the
-user named — so the JSON/CSV schema and the "Events worth watching"
-section work uniformly across all runs.
+user named.
 
-The full watchlist mechanics (building the CSV, domain handling, the
-100-company cap, uploading the dataset, submitting with
+The full watchlist mechanics (building the company list, domain
+handling, the 100-company cap, building the dataset, submitting with
 `connected_dataset_ids`, polling, and parsing `connected_entities`) are
 in `references/COMPANY-WATCHLIST.md`. Follow that verbatim — do not
 improvise, and do not write a helper script.
 
-`COMPANY-WATCHLIST.md` § Execution path decides how the upload and
-connected submits actually run — MCP tools, `curl`, or, where neither
-works (e.g. the hosted claude.ai app), a fall back to naming every
-competitor directly in the bucket queries (short list) or telling the
-user to run it in Claude Code (long list). A fallback is expected
-behavior, not an error.
+Watchlist mode runs entirely through the CatchAll MCP, so it works on
+every platform with the MCP connected — claude.ai and ChatGPT included.
+The only fallback is when the MCP lacks the watchlist tools (an older
+CatchAll MCP): name every competitor directly in the bucket queries
+(short list) or tell the user to update the MCP (long list). A fallback
+is expected behavior, not an error. See `COMPANY-WATCHLIST.md`
+§ Execution path.
 
 Skill-specific details for competitor-snapshot:
 - Dataset name slug: `competitor-snapshot`
@@ -73,18 +76,17 @@ Skill-specific details for competitor-snapshot:
   "events found"; everything lower-scored goes to the JSON/CSV downloads
   only
 
-The chat **output template** varies by watchlist size (not by execution
-path, since there's only one path now):
+The chat **output template** varies by watchlist size:
 - 1 company → single-competitor template (no Company column, no at-a-glance)
 - 2+ companies → multi-competitor template (Company column, at-a-glance table)
 
 ### Load more
 
-The default per-bucket `limit` is 100. If any bucket hits the cap
-(`valid_records == 100`), add a short note under that bucket's table
-in chat: `Showing 100 of [N estimated]. Ask to load more.` If the user
-asks to load more, call `mcp__catchall__continue_job` with a new higher
-limit (e.g., 250 or 500), repoll to terminal, re-pull all pages, and
+Each bucket's `limit` is the number chosen in the `Max results` picker.
+If any bucket hits that cap (`valid_records == limit`), add a short note
+under that bucket's table in chat: `Showing [limit] of [N estimated].
+Ask to load more.` If the user asks to load more, call `continue_job`
+with a new higher limit, repoll to terminal, re-pull all pages, and
 regenerate the xlsx, JSON, and CSV files atomically.
 
 ## Bucket queries
@@ -94,41 +96,40 @@ path, the query names the competitor. In watchlist-mode, the query
 omits the company name (the `connected_dataset_ids` parameter scopes
 the search to the watchlist).
 
-> **Before submitting any jobs**, read `references/1-QUERY-REVIEW.md`.
+> **Before submitting any jobs**, read `references/QUERY-REVIEW.md`.
 > It defines when to confirm scope and parameters with the user vs.
 > proceed with defaults. Critical for multi-competitor runs and any
 > query where the time window isn't specified.
 
-> **For any 2+ competitor run**, read `references/COMPANY-WATCHLIST.md`
-> for the watchlist mechanics (CSV build, upload, connected submits,
-> attribution). Skip for single-competitor runs.
+> **For the watchlist mechanics** (building the company list, batch-
+> creating entities, the dataset, connected submits, attribution), read
+> `references/COMPANY-WATCHLIST.md` — every run uses it (single-competitor
+> runs build a watchlist of 1).
 
-> **Then read `references/2-JOB-LIFECYCLE.md`** for polling, completion
-> detection, concurrency, the user-facing progress table, the 20/40/60-min
-> checkpoint schedule, the 90-min run-level cap with ⚠ Pending status,
-> the re-poll-on-follow-up pattern, lookback pre-flight, the
-> no-helper-scripts rule, and failure handling. Follow it verbatim — do
-> not improvise. The progress table uses per-category rows (one row per
-> bucket, no "wave" / "Build report" rows) and the same row structure
+> **Then read `references/JOB-LIFECYCLE.md`** (per-search contract:
+> pre-flight, host-aware polling, completion detection, failure handling)
+> **and `references/CONCURRENCY.md`** (the multi-search layer: waves, the
+> live progress table, checkpoints, no time cap, re-poll on follow-up).
+> Follow both verbatim — do not improvise. The progress table uses
+> per-category rows (one row per bucket) and the same row structure
 > persists across every checkpoint, with status emojis and live counts
 > updating in place.
 
-> **Before writing output**, read `references/3-OUTPUT-ARTIFACTS.md`
+> **Before writing output**, read `references/OUTPUT-REPORT.md`
 > (xlsx + JSON + CSV full-dataset contract: file naming, schema, columns, the
-> `Full dataset:` block, vocabulary, dates) and `references/4-NEXT-STEPS.md`
-> (the `More with CatchAll:` footer that closes every chat output).
+> `Full dataset:` block, vocabulary, dates) and `references/NEXT-STEPS.md`
+> (the **More with CatchAll** footer that closes every chat output).
 
-Submit queries in concurrency-sized waves (see `2-JOB-LIFECYCLE.md`
-§ Concurrency). Most users have 2 concurrent slots; with 7 buckets that
-means 4 sequential waves, ~40–60 min total wall-clock. **Each bucket is
-an independent CatchAll query.** Some events plausibly fit two buckets
-(e.g., an earnings release that mentions a layoff). Do not move events
-between buckets after pull — render each bucket's results as CatchAll
-returned them.
+Submit queries in concurrency-sized waves (see `references/CONCURRENCY.md`
+— read the concurrency limit first, open with the generous time estimate
+and the kickoff table). **Each bucket is an independent CatchAll query.**
+Some events plausibly fit two buckets (e.g., an earnings release that
+mentions a layoff). Do not move events between buckets after pull —
+render each bucket's results as CatchAll returned them.
 
-Note: "wave" is implementation vocabulary only. **User-facing rows in
-the progress table never say "wave"** — they say `Searching <category>`
-(see `2-JOB-LIFECYCLE.md` § Stage rows).
+Note: "wave" and "bucket" are implementation vocabulary only — **they
+never appear in user-facing text.** A unit of work is a **search**; table
+rows say `Searching <category>` (see `references/CONCURRENCY.md`).
 
 ### Cross-cutting enrichment (every bucket)
 
@@ -214,10 +215,9 @@ Enrichments:
 ## Output
 
 Every run produces four deliverables: a markdown chat response, an xlsx
-workbook, a JSON file, and a CSV file. See `references/3-OUTPUT-ARTIFACTS.md`
+workbook, a JSON file, and a CSV file. See `references/OUTPUT-REPORT.md`
 for the file naming, sheet/column structure, schema, vocabulary, date
-formatting, table conventions, and zero-event pattern shared across
-all CatchAll skills.
+formatting, table conventions, and zero-event pattern.
 
 The chat response is a compressed summary. Full enumeration lives in
 the full dataset (the xlsx, JSON, and CSV files). Lead with the dataset;
@@ -226,8 +226,7 @@ the strategic reading is the reader's job, not the skill's.
 ### Per-bucket table columns
 
 Use "events found" universally in section headers. The table per bucket
-has different columns based on what data the bucket naturally produces —
-this shows the dynamic-schema story (different shapes per query type).
+has different columns based on what data the bucket naturally produces.
 
 | Bucket | Table columns (after Event, Date; before Sources) |
 |---|---|
@@ -252,8 +251,7 @@ the `ed_score >= 8` events; everything lower-scored lives silently in
 the full dataset. The reader never sees the scoring at all.
 
 **Event title length**: truncate event titles to ~100 characters
-(append `…` if truncated). The earlier ~70 limit cut titles mid-thought;
-~100 gives enough room for a complete phrase. **Date cells**: write the
+(append `…` if truncated). **Date cells**: write the
 month and day joined by a non-breaking space (U+00A0) — e.g. `May·20`
 with a non-breaking space — so a short date never wraps to two lines in
 a narrow column.
@@ -355,11 +353,12 @@ _Early signals on rumored, in-talks, planned, or upcoming stories._
 - [Cross-category story bullet — see formats below. Omit entirely if no story genuinely spans 2+ categories.]
 
 ---
-More with CatchAll: [Run this on a schedule with Monitors](…) · [Learn about Company Watchlists](…) · [Docs](…) · [Book a demo](…)
+## More with CatchAll
+[Run this on a schedule with Monitors](…) · [Learn about Company Watchlists](…) · [Docs](…) · [Book a demo](…)
 ```
 
-The chat output ends with the `More with CatchAll:` footer — see
-`references/4-NEXT-STEPS.md` for the exact links and URLs. The
+The chat output ends with the **More with CatchAll** footer — see
+`references/NEXT-STEPS.md` for the exact links and URLs. The
 company-watchlist link is included for watchlist-mode runs and omitted
 for single-competitor runs.
 
@@ -417,11 +416,11 @@ leave all other cells blank (no em-dashes — em-dashes imply "no data
 for this field" rather than "no row exists"). No commentary about
 what the candidate noise was. The `noise_description` for that bucket
 stays in the JSON for pipelines. This pattern is required by
-`3-OUTPUT-ARTIFACTS.md` across all CatchAll skills.
+`OUTPUT-REPORT.md`.
 
 ### Output integrity rules
 
-These prevent the rendering bugs that have appeared in past runs:
+These prevent common rendering bugs:
 
 - **Render all 7 bucket sections, in the exact order above, every
   time.** A bucket with 0 events still gets its dashboard line and
@@ -436,8 +435,8 @@ These prevent the rendering bugs that have appeared in past runs:
   section's `##` header). A blank line collapses to minimal vertical
   space in most renderers; `---` draws a thin line with padding above
   and below, giving the eye a clear break between sections. The existing
-  `---` immediately before the `More with CatchAll:` footer is part of
-  this same pattern — it's no longer a special case.
+  `---` immediately before the **More with CatchAll** footer is part of
+  this same pattern.
 - **Use the short date form `May 16` (no year) inside table cells.**
   Full `May 16, 2026` wraps to two lines in narrow columns; the year
   is already carried by the window header.
@@ -464,16 +463,14 @@ This applies to:
   output. The reader sees the tables and `([n] more in the full
   dataset)` — nothing about how the result was produced.
 
-This is non-negotiable. Two real examples of the wrong thing: an agent
-flagging "Dia is The Browser Company's product", and an agent appending
-a "One note on the data: watchlist matching is mention-based…" caveat.
-Both were helpful instincts but wrong-architecture — they editorialize
-the demo and bury the reader in mechanics. Show the data. Trust the
-user to evaluate it.
+This is non-negotiable. Do not flag attribution corrections (e.g. "Dia
+is The Browser Company's product"), and do not append data-quality notes
+(e.g. "One note on the data: …"). Show the data. Trust the user to
+evaluate it.
 
 The only thing the skill writes about run quality is `meta.run_flags[]`
-in the JSON, and only for operational issues (job failed, hit 90-min
-cap). These stay in JSON only — never in chat.
+in the JSON, and only for operational issues (job failed, results pulled
+before completion). These stay in JSON only — never in chat.
 
 ### Chat response — multi-competitor (watchlist mode)
 
@@ -543,7 +540,8 @@ _Early signals on rumored, in-talks, planned, or upcoming stories._
 [Same two-bullet Analysis section as the single-competitor template.]
 
 ---
-More with CatchAll: [Run this on a schedule with Monitors](…) · [Learn about Company Watchlists](…) · [Docs](…) · [Book a demo](…)
+## More with CatchAll
+[Run this on a schedule with Monitors](…) · [Learn about Company Watchlists](…) · [Docs](…) · [Book a demo](…)
 ```
 
 **Chat tables and every "events found" count show only the events whose
@@ -554,21 +552,20 @@ silently into the JSON/CSV full dataset, never appearing in chat. The
 reader is not shown the scoring at all; the `([n-10] more in the full
 dataset)` line is all they see. See `COMPANY-WATCHLIST.md` Step 4.
 
-### Load-more note (when a bucket hit the 100 cap)
+### Load-more note (when a bucket hit the cap)
 
-When any bucket's `valid_records == 100`, append a single italicized
-line directly below that bucket's table:
+When any bucket's `valid_records` equals the chosen `limit`, append a
+single italicized line directly below that bucket's table:
 
 ```
-_Showing 100 of [estimated total] events. Ask to load more if you want the full set._
+_Showing [limit] of [estimated total] events. Ask to load more if you want the full set._
 ```
 
 The estimated total can be inferred from `candidates_scanned` or omitted
-if uncertain (just say `100 of more`). When the user asks to load more,
-call `mcp__catchall__continue_job` with a higher `new_limit` (default
-jump to 500), repoll to terminal, re-pull all pages, then regenerate
-the xlsx, JSON, and CSV files atomically and re-render the chat output. Do not
-append; rewrite.
+if uncertain (just say `[limit] of more`). When the user asks to load
+more, call `continue_job` with a higher `new_limit`, repoll to terminal,
+re-pull all pages, then regenerate the xlsx, JSON, and CSV files
+atomically and re-render the chat output. Do not append; rewrite.
 
 ### Events worth watching — selection rule
 
@@ -580,7 +577,7 @@ events out, no agent judgment:
 1. Start from all events where `is_developing == true`
 2. Filter `ed_score >= 8` (same centrality bar as the main buckets — the section is about your watchlist companies, not adjacent ones)
 3. Dedup by title across buckets — if the same event appears in two buckets, keep the row from the bucket where it scored highest
-4. Sort by citation count desc (same sort as the main bucket tables — see `3-OUTPUT-ARTIFACTS.md` § Tables for event lists)
+4. Sort by citation count desc (same sort as the main bucket tables — see `OUTPUT-REPORT.md` § Tables for event lists)
 5. Take top 10 (matches the cap used in every bucket table — same number everywhere keeps the reader's mental model consistent)
 
 If 0 events remain after filtering, skip the section entirely. There is
@@ -609,8 +606,7 @@ row).
 ### What this output deliberately does not include
 
 - **No "So what" / strategic interpretation.** The skill enumerates;
-  the reader interprets. Strategy commentary is what makes CatchAll
-  output look like every other AI-written brief.
+  the reader interprets.
 - **No narrative headline collapsing multiple events into a story.**
   Each event is one row in the table. The narrative emerges from the
   numbers, not from the prose.

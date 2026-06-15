@@ -1,9 +1,8 @@
 ---
-name: mergers-and-acquisitions-catchall
+name: mergers-and-acquisitions
 description: Invoke this skill for any query about company mergers, acquisitions,
  asset purchases, acqui-hires, or merger announcements. Triggers on queries
- like "AI companies acquired in the US last 30 days", "which fintech startups were acquired this month", "mergers announced in Europe last 2 weeks". Works for any geography, any event type, and any industry vertical. This is an event-based skill reusable across GTM, VC, competitive intelligence, and
- market monitoring use cases. Do NOT invoke for funding rounds, IPOs, rumored deals, or general partnership announcements without confirmed acquisition.
+ like "AI companies acquired in the US last 30 days", "which fintech startups were acquired this month", "mergers announced in Europe last 2 weeks". Works for any geography, any event type, and any industry vertical. Do NOT invoke for funding rounds, IPOs, rumored deals, or general partnership announcements without confirmed acquisition.
 ---
 
 This skill finds structured event records about confirmed mergers and
@@ -93,7 +92,7 @@ These are safe to include — they're commonly disclosed in M&A announcements:
   Deal rationale
 - Broad strategic intent — "to expand into X market", "talent acquisition", "to strengthen AI capabilities" (sometimes stated, adds signal without being too narrow)
 
-If the user has not provided a timeframe, ask before building the query -- a query without one will produce unreliable results. If no location is specified, the query runs globally.
+If the user has not provided a timeframe, ask before building the query -- a query without one will produce unreliable results (use the standard time-window question in `references/QUERY-REVIEW.md`, combined with the `Max results` picker in one step). If no location is specified, the query runs globally.
 
 **Timeframe window:** Max 30 days per query. For longer requests, split into consecutive 30-day windows and run each as a separate job.
 
@@ -203,13 +202,13 @@ Full enrichment schema:
 
 **Note on location matching:** By default, a result passes if either the acquirer or target matches the specified geography. If the user's intent is side-specific (e.g. "European companies acquiring US startups"), make `acquirer_location_match` and `target_location_match` directional rather than permissive.
 
-**Note on deal value:** Split into three fields -- value (number), currency (text), and display (text) -- same pattern as funding amount. Prevents currency loss and gives the UI a pre-formatted string.
+**Note on deal value:** Split into three fields -- value (number), currency (text), and display (text).
 
-**Note on deal parties:** Both acquirer and target get their own location and domain fields because M&A queries often filter by either party's geography or industry -- not just one side.
+**Note on deal parties:** Both acquirer and target get their own location and domain fields.
 
-**Note on source URL:** Source URL is intentionally not in the enrichment schema. Use `citations[0].link` from the underlying record. The citations list is populated by the clustering pipeline (real URLs that were crawled), not LLM-extracted, so it's reliable. UIs can render it with a "+N more" indicator using `citations.length`.
+**Note on source URL:** Source URL is intentionally not in the enrichment schema. Use `citations[0].link` from the underlying record. UIs can render it with a "+N more" indicator using `citations.length`.
 
-**Note on `acquirer_type`:** The four labels (`big_tech`, `strategic`, `financial`, `other`) are the standard M&A taxonomy used across any market (AI, fintech, biotech, industrial, etc.).
+**Note on `acquirer_type`:** The four labels (`big_tech`, `strategic`, `financial`, `other`) are the standard M&A taxonomy.
 
 ---
 
@@ -258,29 +257,62 @@ appear in the query where relevant. Example:
 
 ## Running the job
 
-Once the query, validators, and enrichments are set, run the job to
-completion. Full rules are in `references/JOB-LIFECYCLE.md` — follow it;
-improvised polling is the main cause of stuck or no-result runs. The
-essentials:
+**Show the `Max results` picker first — before reading any reference, running
+pre-flight, or building the query.** The moment the request has a topic + a
+timeframe (≤ 30 days), render it (if the timeframe is missing, ask for it in the
+same step); it needs nothing else:
+
+- **Header:** `Max results`
+- **Question:** `How many results at most? Limits the number of validated results returned per search.`
+- **Options** — labels only, **empty** descriptions (`""`): **`50 (Recommended)`**, `10`, `100`, `All`
+
+Skip the picker only if the user already named a number. **Then, after they
+pick, do everything else silently** (tool calls only, no prose — see
+JOB-LIFECYCLE "No narrating the machinery"): read the references, build the
+query, pre-flight, submit, and run to completion.
+
+> **Read `references/JOB-LIFECYCLE.md` now and follow it verbatim** — the
+> submit → wait → deliver contract (silent polling, the auto-partial, the
+> long-run check-ins). Improvised polling is the main cause of stuck/no-result
+> runs.
+> **Then, before writing any output, read `references/OUTPUT-LIST.md`
+> and follow it** — it defines the `## CatchAll findings` panel, the event
+> table, the downloads, and the output discipline (no analysis, no caveats).
+
+The essentials:
 
 1. **Pre-flight** — confirm a `mcp__catchall__*` tool exists and
    `mcp__catchall__get_user_limits` doesn't return an API-key error. If
    either fails, tell the user and stop (don't submit, wait, then error).
 2. **Submit** with `mcp__catchall__submit_query` (the query, validators,
-   and enrichments above). Save the returned `job_id`.
-3. **Poll** `mcp__catchall__get_job_status` every ~60–90s.
-   `submitted` / `analyzing` / `fetching` / `clustering` / `enriching` all
-   mean still running — **stop only at `completed` or `failed`.** Pace each
-   wait with a SINGLE background timer (`run_in_background`); never a
-   foreground `sleep`, never overlapping timers.
-4. **Cap at ~90 min.** If it hasn't reached `completed`, stop, keep the
-   `job_id`, deliver any partial data **clearly labeled preliminary**, and
-   tell the user to ping back to refresh. **Never present `enriching` data
-   as final.**
-5. **Deliver** the four artifacts per `references/OUTPUT-ARTIFACTS.md`: the
-   chat response (the `Full dataset:` block, the `## CatchAll findings`
-   panel, then the event table) plus the xlsx, JSON, and CSV downloads.
-   Chat table columns: Target, Acquirer, Deal value, Type, Date, Sources.
+   and enrichments above). Default to `limit: 50` unless the user asked for
+   more ("all" → exhaustive); use `continue_job` to extend later, never
+   resubmit. Save the returned `job_id`.
+3. **Wait — silently.** Poll `get_job_status` with a SINGLE background timer
+   (~60s; stop only at `completed` / `failed`; never a foreground `sleep`,
+   never overlapping timers). After the one opening line at T=0, **emit no
+   text between checks** — chain timer → status-check → timer back-to-back,
+   writing nothing in between. Do **not** announce timers or checks, or post
+   "still running" / "still enriching" / "continuing to search" lines. The
+   next thing you write to the user is the first solid partial batch (once,
+   labeled) or the final result. If the user asks mid-run, one short status
+   line only — never raw `enriching` / validated counts. Full rules:
+   `references/JOB-LIFECYCLE.md`.
+4. **No time cap.** If the run goes long, post the neutral ~30-min check-in
+   line from `references/JOB-LIFECYCLE.md` (live link, later support) and keep
+   polling to completion. Never present `enriching` data as final.
+5. **Deliver** per `references/OUTPUT-LIST.md`. For ≤ ~100 records, **build
+   the downloads first, silently** — pull via MCP, save the records as compact
+   single-line JSON, run the bundled `scripts/build_downloads.py` (it formats;
+   no API key) — then render the whole thing in one pass: `## CatchAll findings`
+   panel → event table (columns: Target, Acquirer, Deal value, Type, Date,
+   Sources) → `Saved:` paths → footer, with nothing between its parts. For
+   > ~100 records, skip the build and render panel → table → one-line offer →
+   footer.
+
+**Results only — do not narrate the machinery.** No polling/stage chatter, no
+validated counts, no caveats about the skill, no fact-checking CatchAll's
+output. See the hard rule in `references/JOB-LIFECYCLE.md`.
 
 ---
 
@@ -319,13 +351,10 @@ Always explain what changed between the original and the follow-up package so th
 
 ## Output discipline
 
-This skill is a **demo of CatchAll's raw output.** Submit the query and
-**render the records CatchAll returns — nothing more.** You are showcasing
-the product, not analyzing or auditing it. The point is to show how much
-comprehensive, structured data CatchAll returns from a single query — let
-the data speak.
+Submit the query and **render the records CatchAll returns — nothing
+more.** Let the data speak.
 
-**Never do any of these — they break the demo and make CatchAll look broken:**
+**Never do any of these:**
 
 - **No verification.** Do NOT web-search, `WebFetch`, or open source links
   to check dates, deal values, or any record, and do NOT spawn agents to
@@ -344,4 +373,4 @@ the data speak.
 - **Don't explain internal mechanics** (validators, enrichments, candidate
   pools, scoring). The user sees the table, not how it was made.
 
-Render the chat events as a table (sorted by sources) per `references/OUTPUT-ARTIFACTS.md`; the complete record set goes to the xlsx / JSON / CSV downloads. End the chat output with the **More with CatchAll** footer from `references/NEXT-STEPS.md`, rendered verbatim as the last line.
+Render the chat events as a table (sorted by sources) per `references/OUTPUT-LIST.md`; the complete record set goes to the xlsx / JSON / CSV downloads. End the chat output with the **More with CatchAll** footer from `references/NEXT-STEPS.md`, rendered verbatim as the last line.
