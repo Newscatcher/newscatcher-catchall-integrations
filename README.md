@@ -41,9 +41,10 @@ To install a skill with Claude, copy its folder into your project's `.claude/ski
 | Skill | Use Case | Trigger Phrases | Interface | Folder |
 |---|---|---|---|---|
 | General Use Case | General-purpose CatchAll access: submit queries, poll jobs, pull results, monitors, webhooks, datasets, entities, projects | Any CatchAll task without a dedicated skill | MCP | [`skills/general-use-case`](./skills/general-use-case/) |
-| Competitor Snapshot | Structured digest of a competitor's recent moves: product launches, pricing, leadership, M&A, partnerships | "Snapshot [company]", "what's [competitor] been up to", "competitive brief on [company]" | MCP + API fallback | [`skills/competitor-snapshot`](./skills/competitor-snapshot/) |
-| Fundraising | Confirmed funding announcements across any geography, stage, and industry | "Series B raises in Austin last 30 days", "AI startups that raised seed this month" | MCP | [`skills/fundraising`](./skills/fundraising/) |
-| Mergers & Acquisitions | Confirmed M&A deals — acquisitions, mergers, asset purchases, acqui-hires | "AI companies acquired in the US last 30 days", "fintech mergers this week" | MCP | [`skills/mergers-and-acquisitions`](./skills/mergers-and-acquisitions/) |
+| Competitor Snapshot | Structured digest of a competitor's recent moves: product launches, pricing, leadership, M&A, partnerships | "Snapshot [company]", "what's [competitor] been up to", "competitive brief on [company]" | MCP + API fallback | [`skills/competitor-snapshot-catchall`](./skills/competitor-snapshot-catchall/) |
+| Fundraising | Confirmed funding announcements across any geography, stage, and industry | "Series B raises in Austin last 30 days", "AI startups that raised seed this month" | MCP | [`skills/fundraising-catchall`](./skills/fundraising-catchall/) |
+| Mergers & Acquisitions | Confirmed M&A deals — acquisitions, mergers, asset purchases, acqui-hires | "AI companies acquired in the US last 30 days", "fintech mergers this week" | MCP | [`skills/m&a-catchall`](./skills/m&a-catchall/) |
+| VC Pack | Combined funding + M&A market intelligence dashboard — capital flowing into and out of a sector in one view | "VC pack for fintech", "funding and M&A in cybersecurity last 30 days", "capital activity in healthcare AI", "where is money moving in climate" | MCP | [`skills/vc-pack-catchall`](./skills/vc-pack-catchall/) |
 
 > **For any contributor:** add a row to the table above each time a new skill is merged. Fill in all four columns. Keep the folder path relative so links stay valid after cloning.
 
@@ -61,7 +62,7 @@ The foundational CatchAll skill. Covers the full platform surface via MCP: jobs,
 ---
 
 ### Competitor Snapshot
-**Folder:** `skills/competitor-snapshot` · **Interface:** MCP (`https://catchall-mcp.newscatcherapi.com/mcp`) — falls back to REST API if MCP is unavailable
+**Folder:** `skills/competitor-snapshot-catchall` · **Interface:** MCP (`https://catchall-mcp.newscatcherapi.com/mcp`) — falls back to REST API if MCP is unavailable
 
 Produces a structured digest of a competitor's recent moves across the categories that competitive intelligence teams, product strategists, and sales enablement actually use: product launches, pricing changes, leadership moves, customer wins, partnerships, M&A activity, and financial signals.
 
@@ -69,12 +70,12 @@ Works on a single competitor or a watchlist of up to 100 companies uploaded as C
 
 Best for: CI analysts, product managers, sales enablement, founders doing market scans, board prep, consultants.
 
-→ [Read the skill documentation](./skills/competitor-snapshot/SKILL.md)
+→ [Read the skill documentation](./skills/competitor-snapshot-catchall/SKILL.md)
 
 ---
 
 ### Fundraising
-**Folder:** `skills/fundraising` · **Interface:** MCP (`https://catchall-mcp.newscatcherapi.com/mcp`)
+**Folder:** `skills/fundraising-catchall` · **Interface:** MCP (`https://catchall-mcp.newscatcherapi.com/mcp`)
 
 Finds confirmed funding announcements — pre-seed through Series C and beyond — across any geography, funding stage, and industry vertical. Returns structured event records extracted from web sources, not raw article links.
 
@@ -82,12 +83,12 @@ Built for GTM, VC research, recruiting, and market intelligence workflows. Knows
 
 Best for: VCs tracking deal flow, GTM teams building prospect lists, analysts monitoring market activity.
 
-→ [Read the skill documentation](./skills/fundraising/SKILL.md)
+→ [Read the skill documentation](./skills/fundraising-catchall/SKILL.md)
 
 ---
 
 ### Mergers & Acquisitions
-**Folder:** `skills/mergers-and-acquisitions` · **Interface:** MCP (`https://catchall-mcp.newscatcherapi.com/mcp`)
+**Folder:** `skills/m&a-catchall` · **Interface:** MCP (`https://catchall-mcp.newscatcherapi.com/mcp`)
 
 Finds confirmed M&A deals — acquisitions, mergers, asset purchases, and acqui-hires — across any geography and industry. Returns structured event records with deal type, parties involved, deal value (where disclosed), and deal status.
 
@@ -95,7 +96,22 @@ Like the Fundraising skill, it operates on the event layer: queries describe rea
 
 Best for: competitive intelligence, deal sourcing, market monitoring, GTM targeting of recently-acquired companies.
 
-→ [Read the skill documentation](./skills/mergers-and-acquisitions/SKILL.md)
+→ [Read the skill documentation](./skills/m&a-catchall/SKILL.md)
+
+---
+
+### VC Pack
+**Folder:** `skills/vc-pack-catchall` · **Interface:** MCP (`https://catchall-mcp.newscatcherapi.com/mcp`)
+
+Delivers a combined market-intelligence dashboard covering both capital inflows (funding rounds) and outflows (acquisitions) for any sector, geography, and timeframe up to 30 days. Runs two parallel CatchAll jobs — one for funding events, one for M&A deals — and merges the results into a single HTML dashboard.
+
+The dashboard is never shown in a partial state: both feeds must complete before any aggregate statistics (deal-stage breakdown, sub-sectors, capital ratio, top-3 deals, mega-rounds %) are computed. Progress during the run is shown as a live side-by-side status table instead.
+
+Includes `assets/dashboard.html` (visual output template), `assets/render.py` (rendering script), and `scripts/render.py` (standalone render runner).
+
+Best for: VCs and analysts who want a full picture of where capital is moving in a market — not just funding or just M&A in isolation.
+
+→ [Read the skill documentation](./skills/vc-pack-catchall/SKILL.md)
 
 ---
 
@@ -165,15 +181,16 @@ Each skill and integration is self-contained. Navigate to its folder and follow 
 ```
 newscatcher-catchall-integrations/
 ├── skills/
-│   ├── general-use-case/          # Core CatchAll API skill (submit → poll → pull, monitors)
-│   ├── competitor-snapshot/       # Competitive intelligence skill
-│   ├── fundraising/               # Funding round tracking skill
-│   └── mergers-and-acquisitions/  # M&A deal tracking skill
+│   ├── general-use-case/              # Core CatchAll skill (jobs, monitors, webhooks, datasets)
+│   ├── competitor-snapshot-catchall/  # Competitive intelligence skill
+│   ├── fundraising-catchall/          # Funding round tracking skill
+│   ├── m&a-catchall/                  # M&A deal tracking skill
+│   └── vc-pack-catchall/              # Combined funding + M&A market dashboard skill
 ├── Claude/
-│   └── Claude Agent/              # Anthropic Claude API integration
+│   └── Claude Agent/                  # Anthropic Claude API integration
 ├── crew_ai/
-│   ├── deep_search_agent/         # Iterative research agent (CrewAI)
-│   └── risk_management_agent/     # Supply chain risk agent (CrewAI)
+│   ├── deep_search_agent/             # Iterative research agent (CrewAI)
+│   └── risk_management_agent/         # Supply chain risk agent (CrewAI)
 └── README.md
 ```
 
