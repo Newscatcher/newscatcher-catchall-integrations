@@ -125,7 +125,8 @@ to `submit_query`.
 | Preview auto-selected validators/enrichments/dates | `initialize_query` |
 | Submit a query and start a job | `submit_query` |
 | Check job processing status | `get_job_status` |
-| Retrieve results (partial or complete) | `pull_results` |
+| Retrieve results (partial or complete) as JSON | `pull_results` |
+| Download completed job results as a CSV file | `pull_job_csv` |
 | Fetch more records beyond the initial limit | `continue_job` |
 | List past jobs | `list_user_jobs` |
 | Delete a job and its results | `delete_job` |
@@ -136,19 +137,29 @@ every ~60 seconds to track completion.
 
 **Status progression:** `submitted → analyzing → fetching → clustering → enriching → completed`
 
+**CSV vs. JSON:** Use `pull_job_csv` when the consumer needs a spreadsheet or
+CSV file. Use `pull_results` when you need paginated JSON (e.g., to display
+results inline or pass them to a downstream tool that expects structured JSON).
+`pull_job_csv` requires the job to be in `completed` status.
+
 ### Monitors
 
 | Task | Tool |
 |---|---|
 | Create a recurring scheduled job | `create_monitor` |
 | List all active monitors | `list_monitors` |
-| Get latest run output | `pull_monitor_results` |
+| Get latest run output as JSON | `pull_monitor_results` |
+| Download latest run results as a CSV file | `pull_monitor_csv` |
 | See all runs for a monitor | `list_monitor_jobs` |
 | See monitor state change history | `get_monitor_status` |
 | Pause a monitor | `disable_monitor` |
 | Resume a paused monitor | `enable_monitor` |
 | Change webhook or per-run limit | `update_monitor` |
 | Delete a monitor permanently | `delete_monitor` |
+
+**CSV vs. JSON for monitors:** Use `pull_monitor_csv` when the user wants to
+download the most recent monitor run as a spreadsheet. Use `pull_monitor_results`
+for inline JSON inspection or downstream processing.
 
 ### Webhooks
 
@@ -175,6 +186,8 @@ every ~60 seconds to track completion.
 | Get / update / delete an entity | `get_entity` / `update_entity` / `delete_entity` |
 | List all entities | `list_entities` |
 | Create a dataset (named collection of entities) | `create_dataset` |
+| Create a dataset by uploading CSV content | `create_dataset_from_csv` |
+| Append CSV content to an existing dataset | `append_csv_to_dataset` |
 | Add / remove entities from a dataset | `add_dataset_entities` / `remove_dataset_entities` |
 | List entities in a dataset | `list_dataset_entities` |
 | Get dataset enrichment status | `get_dataset_status` |
@@ -226,6 +239,9 @@ need specific fields extracted. Use `base` for any structured output.
 **Never use `page_size` to control how much data is processed.** Use `page_size`
 only for pagination of results already processed by a job. The `limit` is the
 lever that controls both scope and cost.
+
+**`limit` minimum:** If `limit` is provided, it must be `>= 10`. Omit `limit`
+entirely to retrieve everything up to your plan's maximum.
 
 ### Limit heuristics
 
@@ -286,6 +302,17 @@ to named entities in the list.
 3. Wait for dataset status to reach `ready` — entities are enriched before first use
 4. Pass `connected_dataset_ids: [<dataset_id>]` in `submit_query`
 
+**`external_entity_id` — linking entities to external systems:**
+
+Both `create_entity` and `update_entity` accept an optional `external_entity_id`
+string. Set this when entities correspond to records in an external system (e.g.,
+a CRM, data warehouse, or internal database). The value is a customer-supplied
+identifier that CatchAll stores alongside the entity for traceability. Always set
+it at creation time if you have a stable external ID — it is much harder to
+reconcile after the fact.
+
+Example: `"external_entity_id": "crm-account-00123"`
+
 **`ed_score_min` — entity confidence threshold:**
 
 When using a dataset, each result is scored against how confidently it matches
@@ -299,6 +326,47 @@ to filter out weak matches:
 | omit | No threshold — returns everything, including weak associations |
 
 Start at `8`. If the user reports too few results, lower to `5`.
+
+**`ed_association_type` — entity association strength:**
+
+When `connected_dataset_ids` is set, use `ed_association_type` to control how
+strongly a watchlist entity must appear in each event:
+
+| Value | Effect |
+|---|---|
+| `"event_associated"` | Keep only events where the entity is a **direct actor** (default when connected_dataset_ids is set) |
+| `"mention"` | Keep all events where the entity is **merely referenced**, even in passing |
+
+Use `"event_associated"` (or omit the parameter) for tight, high-signal results.
+Use `"mention"` when the user wants broader coverage and is comfortable with
+more tangential references.
+
+**`fetch_all_watchlist_news` — bypass topic filtering:**
+
+When `True`, retrieves **all** news for connected watchlist entities without
+applying topic filtering from `query`. Use this when the user wants a general
+news feed for their watchlist rather than topic-specific results. Requires
+`connected_dataset_ids` to be set. Default: `False`.
+
+Also pass `fetch_all_watchlist_news=True` to `initialize_query` when you intend
+to use it in `submit_query` — this ensures the previewed validators and
+enrichments are generated to match the all-news intent.
+
+**Query-writing rules when using connected datasets:**
+
+- Write the `query` to describe the **topic or event type only** — for example,
+  `"M&A activity"`, `"regulatory filings"`, `"executive changes"`. Do NOT write
+  things like `"for my companies"`, `"for the selected list of companies"`, or
+  `"news about my watchlist"` — entity filtering is applied automatically by the
+  connected dataset. Mentioning companies in the query degrades retrieval quality.
+- Entity-relevance validators (e.g. `company_is_primary_subject`) are generated
+  **automatically** by the API when `connected_dataset_ids` is set. Do NOT add
+  them manually to `validators` — they are redundant and may conflict with the
+  auto-generated ones. Only pass validators that describe the event or topic
+  (e.g. `is_acquisition_event`).
+- The same rule applies in `context`: do not ask for entity-relevance validators
+  there, and do not mention that a company list will be attached. Focus `context`
+  on the event or topic specifics only.
 
 **When to use watchlist mode:**
 
@@ -410,7 +478,7 @@ webhook. Follow the **explore → refine → automate** pattern:
 | `schedule` | Natural language with timezone: "every day at 9 AM EST", "every Monday at 8 AM UTC" |
 | `backfill` | Default `true` — fills the gap between the reference job's end date and now. Only works if the reference job's end date is within the last 7 days. Set to `false` for forward-only monitors. |
 | `webhook_ids` | Optional — attach one or more webhooks at creation time |
-| `limit` | Per-run record cap; can be changed later via `update_monitor` |
+| `limit` | Per-run record cap (minimum 10); can be changed later via `update_monitor` |
 
 For schedule syntax and natural-language examples, see
 `references/MONITOR-SCHEDULING.md`.
@@ -467,4 +535,6 @@ Always explain what changed before resubmitting.
 | Monitor returning 0 results after previously returning N | Run `get_monitor_status` to see state history; check if the reference job's validators have become too strict for the current news cycle — resubmit the reference job and create a new monitor if needed |
 | Monitor webhook fails | Use `get_webhook_history` to diagnose; `update_monitor` or `update_webhook` to fix |
 | User wants to re-pull a past job | `list_user_jobs` to find the `job_id`, then `pull_results` |
+| User wants to re-pull a past job as CSV | `list_user_jobs` to find the `job_id`, then `pull_job_csv` |
 | User wants to share work with a teammate | Add resources to a project; teammates with access can filter by project |
+| Connected dataset query returns too many irrelevant results | Verify query describes the topic only (not the entity list); check that entity-relevance validators are not being passed manually — the API generates them automatically |
