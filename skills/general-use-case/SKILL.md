@@ -302,6 +302,33 @@ to named entities in the list.
 3. Wait for dataset status to reach `ready` — entities are enriched before first use
 4. Pass `connected_dataset_ids: [<dataset_id>]` in `submit_query`
 
+**Entity fields:**
+
+| Field | Required | Notes |
+|---|---|---|
+| `name` | Yes | Full legal or widely-recognised company name |
+| `description` | One of `description` or `domain` is required | See guidance below |
+| `additional_attributes.company_attributes.domain` | One of `description` or `domain` is required | Company website, e.g. `"acme.com"` |
+| `entity_type` | No | `"company"` or `"person"` |
+| `external_entity_id` | No | Your own internal ID — see below |
+| `additional_attributes.company_attributes.alternative_names` | No | Other names the company is known by |
+| `additional_attributes.company_attributes.key_persons` | No | Notable executives or founders |
+
+**What makes a strong description:**
+
+Descriptions must **fingerprint the company, not market it**. The enrichment pipeline uses the description to correctly identify and disambiguate the entity in news coverage — a vague description causes missed or incorrect matches.
+
+A good description spans two to four sentences covering:
+- Full legal name and specific industry sector
+- Headquarters location and operating regions
+- Founding year and founders
+- Concrete products or services offered
+
+Drop generic adjectives ("leading", "innovative", "world-class") — they carry no disambiguating signal and waste space.
+
+**Wrong:** `"A leading provider of innovative cloud solutions."`
+**Right:** `"Acme Corp is a B2B SaaS company founded in 2015 in San Francisco, offering sales intelligence and lead-enrichment software to mid-market and enterprise sales teams in North America and Europe."`
+
 **`external_entity_id` — linking entities to external systems:**
 
 Both `create_entity` and `update_entity` accept an optional `external_entity_id`
@@ -338,15 +365,16 @@ strongly a watchlist entity must appear in each event:
 | `"mention"` | Keep all events where the entity is **merely referenced**, even in passing |
 
 Use `"event_associated"` (or omit the parameter) for tight, high-signal results.
-Use `"mention"` when the user wants broader coverage and is comfortable with
-more tangential references.
+Use `"mention"` when the user wants broader coverage. All the simple mentions of the companies will be here, even if a company is not a main actor in the story
+but simply mentioned somewhere in the text. Never use it, unless the user asks for it.
 
 **`fetch_all_watchlist_news` — bypass topic filtering:**
 
 When `True`, retrieves **all** news for connected watchlist entities without
 applying topic filtering from `query`. Use this when the user wants a general
-news feed for their watchlist rather than topic-specific results. Requires
-`connected_dataset_ids` to be set. Default: `False`.
+news feed for their watchlist rather than topic-specific results. This mode usually returns much more data than the topic related mode, but it also returns too much noise.
+It is good when a user does not know exactly what they are looking for and want to explore everything that is available. But for Agentic and Data Pipelines, better not to use this parameter.
+Requires `connected_dataset_ids` to be set. Default: `False`.
 
 Also pass `fetch_all_watchlist_news=True` to `initialize_query` when you intend
 to use it in `submit_query` — this ensures the previewed validators and
