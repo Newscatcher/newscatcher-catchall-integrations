@@ -57,6 +57,25 @@ def load_input(path: str) -> dict:
             "date_range": data.get("date_range") or {}}
 
 
+# --- links (single source: references/links.json) ----------------------------
+
+def load_links() -> dict:
+    """Load the single-source link table shipped next to the skill
+    (references/links.json). Fail loudly if absent — the footer URLs live in
+    exactly one place and are never reconstructed here."""
+    p = Path(__file__).resolve().parent.parent / "references" / "links.json"
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+def footer_links(links: dict, *, watchlist: bool):
+    """(label, url) pairs for the More-with-CatchAll footer, in order. The
+    Company Watchlists link is included only on watchlist runs."""
+    for link in links["footer_links"]:
+        if link.get("watchlist_only") and not watchlist:
+            continue
+        yield link["label"], link["url"]
+
+
 # --- record extraction (defensive across shapes) -----------------------------
 
 def domain_of(url: str) -> str:
@@ -153,16 +172,12 @@ def build_xlsx(meta: dict, events: list, enr_cols: list, path: Path) -> None:
     ov["A5"] = "More with CatchAll:"
     ov["A5"].font = Font(bold=True)
     row = 6
-    for label, url in (
-        ("Run on a schedule with Monitors",
-         "https://www.newscatcherapi.com/docs/web-search-api/guides-and-concepts/monitors"),
-        ("Docs", "https://www.newscatcherapi.com/docs/web-search-api/get-started/quickstart"),
-        ("Book a demo", "https://www.newscatcherapi.com/book-a-demo"),
-    ):
+    links = load_links()
+    for label, url in footer_links(links, watchlist=False):
         c = ov.cell(row, 1, label)
         c.hyperlink, c.font = url, LINK
         row += 1
-    ov.cell(row, 1, "Questions? support@newscatcherapi.com")
+    ov.cell(row, 1, f"Questions? {links['support_email']}")
 
     ri = wb.create_sheet("Run info")
     win = meta.get("window", {})

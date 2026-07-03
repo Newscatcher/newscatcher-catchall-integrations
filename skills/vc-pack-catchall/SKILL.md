@@ -1,5 +1,5 @@
 ---
-name: vc-pack-catchall
+name: vc-pack
 description: Invoke for any query about a market's funding AND acquisition
  activity together — capital flowing into and out of a sector in one view.
  Triggers on "VC pack for fintech", "funding and M&A in cybersecurity last

@@ -1,5 +1,5 @@
 ---
-name: fundraising-catchall
+name: fundraising
 description: Invoke this skill for any query about startup or company funding
  announcements -- pre-seed, seed, Series A, Series B, Series C, and beyond.
  Triggers on queries like "Series B raises in Austin last 30 days", "which
