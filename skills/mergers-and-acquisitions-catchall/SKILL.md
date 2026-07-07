@@ -301,14 +301,13 @@ The essentials:
 4. **No time cap.** If the run goes long, post the neutral ~30-min check-in
    line from `references/JOB-LIFECYCLE.md` (live link, later support) and keep
    polling to completion. Never present `enriching` data as final.
-5. **Deliver** per `references/OUTPUT-LIST.md`. For ≤ ~100 records, **build
-   the downloads first, silently** — pull via MCP, save the records as compact
-   single-line JSON, run the bundled `scripts/build_downloads.py` (it formats;
-   no API key) — then render the whole thing in one pass: `## CatchAll findings`
-   panel → event table (columns: Target, Acquirer, Deal value, Type, Date,
-   Sources) → `Saved:` paths → footer, with nothing between its parts. For
-   > ~100 records, skip the build and render panel → table → one-line offer →
-   footer.
+5. **Deliver** per `references/OUTPUT-LIST.md` — get the records on disk by
+   its **API path** (falling back to its MCP path on a non-zero exit), **build
+   the downloads first, silently** with the bundled
+   `scripts/build_downloads.py`, then render the whole thing in one pass:
+   `## CatchAll findings` panel → event table (columns: Target, Acquirer,
+   Deal value, Type, Date, Sources) → `Saved:` paths (or the one-line offer,
+   per that file) → footer, with nothing between its parts.
 
 **Results only — do not narrate the machinery.** No polling/stage chatter, no
 validated counts, no caveats about the skill, no fact-checking CatchAll's

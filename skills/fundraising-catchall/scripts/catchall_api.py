@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Fetch CatchAll job results straight from the HTTP API to disk — the fast,
-faithful path for report generation, used when the environment allows it.
+faithful path for building the deliverables, used when the environment allows it.
 
 The MCP delivers a pull into the model's *context*, so the model has to
 hand-write it to disk to build the downloads (slow, and the model can fumble
 values). This script fetches each job's full results **directly to
-raw/<bucket>.json**, so the model never carries or re-types the data, and prints
-a **compact digest** (one small line per event — no citation bodies, no
-summaries) for the model to pick spotlights (by record_id) and fill the
-manifest. Then `build_report.py --raw-dir raw` renders the deliverables verbatim
-and writes `raw/digest.json` — the digest the chat is written from.
+raw/<bucket>.json**, so the model never carries or re-types the data, and —
+when the skill bundles a build script — prints a **compact digest** (one small
+line per event — no citation bodies, no summaries) through that script's own
+extractor, so the digest matches what it renders. The skill's build/render
+step then produces the deliverables verbatim from the raw files.
 
 Use it when it works; fall back to the MCP pull when it does not — no API key
 found, or the sandbox can't reach the API (the normal case on claude.ai /
@@ -32,15 +32,42 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))  # co-hydrated build_report
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # the skill's co-bundled build script
 try:
-    import build_report as br  # reuse the one extractor — no second copy of the shaping
-except ImportError:  # pragma: no cover — always co-hydrated in practice
+    import build_report as br  # report skills
+except ImportError:
     br = None
+try:
+    import build_downloads as bd  # list skills
+except ImportError:
+    bd = None
+# The digest reuses the co-bundled build script's extractor — no second copy of
+# the shaping. Report skills bundle build_report, list skills build_downloads;
+# skills with their own render step (neither) get raw pulls and no digest.
+MODE = "report" if br else ("list" if bd else "render")
 
 BASE = "https://catchall.newscatcherapi.com/catchAll"
 # A descriptive User-Agent — the API's edge rejects the default Python-urllib one.
 UA = "catchall-report-skill/1.0"
+
+# Post-pull guidance (stderr), per co-bundled build script — each mode's
+# MCP-fallback step and on-success next step match the skill's own output doc.
+_MCP_NEXT = {
+    "report": "pull each bucket with pull_results and save each result VERBATIM to "
+              "raw/<bucket>.json, then run build_report.py --raw-dir (OUTPUT-REPORT.md § MCP path)",
+    "list": "pull the job with pull_results and save its records to records.json as "
+            "compact single-line JSON, then run build_downloads.py --input records.json "
+            "(OUTPUT-LIST.md § MCP path)",
+    "render": "pull each job with pull_results and hand the records to the skill's "
+              "render step (SKILL.md § MCP path)",
+}
+_OK_NEXT = {
+    "report": "Write manifest.json from the digest below (spotlights by record_id), "
+              "then run build_report.py --raw-dir.",
+    "list": "Run build_downloads.py --input raw/<bucket>.json (flags per OUTPUT-LIST.md "
+            "§ API path), then write the chat table from the digest below.",
+    "render": "Hand the raw/<bucket>.json files to the skill's render step (SKILL.md § API path).",
+}
 
 
 def _catchall_keys(o):
@@ -110,9 +137,16 @@ def pull_job(job_id, key, timeout=30):
 def _digest_bucket(pull):
     """Compact per-bucket view for the model: recall counts + one small event
     line each (no citation bodies, no summaries), sorted most-cited first. Reuses
-    build_report's extractor so the digest matches what --raw-dir will render."""
-    types = br._enrichment_types(pull)
-    evs = [br._event_from_record(r, types) for r in (pull.get("all_records") or [])]
+    the co-bundled build script's extractor so the digest matches what it renders."""
+    if br is not None:
+        types = br._enrichment_types(pull)
+        evs = [br._event_from_record(r, types) for r in (pull.get("all_records") or [])]
+    else:  # build_downloads' extractor carries no id — take it from the record
+        evs = []
+        for r in (pull.get("all_records") or []):
+            e = bd.extract(r)
+            e["id"] = str(r.get("record_id", ""))
+            evs.append(e)
     evs.sort(key=lambda e: len(e["citations"]), reverse=True)
     out = []
     for e in evs:
@@ -120,7 +154,7 @@ def _digest_bucket(pull):
                "citation_count": len(e["citations"]),
                "source": e["citations"][0]["source"] if e["citations"] else "",
                "enrichments": e["enrichments"]}
-        if e.get("company") or e.get("ed_score") != "":  # watchlist attribution present
+        if e.get("company") or e.get("ed_score", "") != "":  # watchlist attribution present
             row.update(company=e.get("company", ""), ed_score=e.get("ed_score", ""),
                        relation=e.get("relation", ""))
         out.append(row)
@@ -137,9 +171,8 @@ def main():
 
     key = find_key()
     if not key:
-        sys.stderr.write("catchall_api: no API key found (env / .env / MCP config) — take the MCP path: "
-                         "pull each bucket with pull_results and save each result VERBATIM to "
-                         "raw/<bucket>.json, then run build_report.py --raw-dir (OUTPUT-REPORT.md § MCP path).\n")
+        sys.stderr.write("catchall_api: no API key found (env / .env / MCP config) — "
+                         f"take the MCP path: {_MCP_NEXT[MODE]}.\n")
         sys.exit(3)
     specs = []
     for b in a.bucket:
@@ -158,19 +191,16 @@ def main():
             pull = pull_job(job_id, key)
             (out / f"{bucket}.json").write_text(json.dumps(pull, ensure_ascii=False), encoding="utf-8")
             sys.stderr.write(f"  {bucket}: {len(pull.get('all_records') or [])} records -> {out}/{bucket}.json\n")
-            if br is not None:
+            if MODE != "render":
                 db = _digest_bucket(pull)
                 digest["buckets"][bucket] = db
                 digest["totals"]["candidates_scanned"] += db.get("candidates_scanned") or 0
                 digest["totals"]["valid_records"] += db.get("valid_records") or 0
     except (urllib.error.URLError, urllib.error.HTTPError, OSError, TimeoutError, ValueError) as e:
-        sys.stderr.write(f"catchall_api: API unreachable/failed ({e}) — take the MCP path: pull each "
-                         "bucket with pull_results and save each result VERBATIM to raw/<bucket>.json, "
-                         "then run build_report.py --raw-dir (OUTPUT-REPORT.md § MCP path).\n")
+        sys.stderr.write(f"catchall_api: API unreachable/failed ({e}) — take the MCP path: {_MCP_NEXT[MODE]}.\n")
         sys.exit(4)
-    sys.stderr.write(f"OK — pulled {len(specs)} bucket(s) via the API to {out}/. Write manifest.json "
-                     "from the digest below (spotlights by record_id), then run build_report.py --raw-dir.\n")
-    if br is not None:
+    sys.stderr.write(f"OK — pulled {len(specs)} bucket(s) via the API to {out}/. {_OK_NEXT[MODE]}\n")
+    if MODE != "render":
         print(json.dumps(digest, ensure_ascii=False, indent=1))
 
 

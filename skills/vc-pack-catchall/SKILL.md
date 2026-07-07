@@ -383,7 +383,8 @@ Read both. Do NOT burn the tool-call budget on chained `sleep` calls upfront.
 5. **Either feed `failed`** → tell the user which side failed and stop.
 6. **If funding is done but M&A is still running** — after a reasonable wait
    (~20–30 min more) — render the **funding side now** instead
-   of making the user wait. Pull funding via the MCP and hand it to `render.py`
+   of making the user wait. Fetch the funding records (per "Hand the data to
+   render.py") and hand them to `render.py`
    with `--ma-pending` so the M&A + capital cards read "still searching." Keep
    both `job_id`s and tell the user: *"Funding's ready — M&A is still searching;
    reply 'refresh' and I'll complete the dashboard."* (Funding is usually the
@@ -396,16 +397,51 @@ Read both. Do NOT burn the tool-call budget on chained `sleep` calls upfront.
 
 ## CRITICAL: Hand the data to render.py — do NOT re-emit it via tokens
 
-Once both jobs report `completed`, pull each feed via the MCP (`pull_results`)
-and hand the data to `render.py` as a **file** — never compute aggregates or
-re-write records inline. render.py does all the aggregation; re-emitting
-records through the LLM is the bottleneck to avoid.
+Once both jobs report `completed`, get each feed's records onto disk and hand
+them to `render.py` as **files** — never compute aggregates or re-write
+records inline. render.py does all the aggregation; re-emitting records
+through the LLM is the bottleneck to avoid.
 
-**There is no API-key / direct-HTTP path** — the records always come through
-the MCP, so the skill runs identically on claude.ai and Claude Code. Two ways
-to get the pulled data to render.py; use the first that applies.
+**Try the API path first; fall back to the MCP path when the environment can't
+use it. The fallback is automatic — a non-zero exit signals it — and silent:
+never mention which path ran in chat.**
 
-### Preferred — saved pull files (no re-emit)
+### API path (preferred)
+
+Fetch both feeds' full results straight to disk. **Run this directly — do not
+check whether an API key exists first.** The script resolves the key itself
+(env / `.env` / MCP config) and signals the outcome by its exit code:
+
+```bash
+python /path/to/skill/scripts/catchall_api.py --out-dir raw \
+  --bucket funding_pull=<funding job_id> --bucket ma_pull=<ma job_id>
+```
+
+- **On exit 0** it wrote `raw/funding_pull.json` and `raw/ma_pull.json` — pass
+  them straight to render.py:
+
+  ```bash
+  python /path/to/skill/scripts/render.py \
+    --funding-pull raw/funding_pull.json \
+    --ma-pull raw/ma_pull.json \
+    --market "Cybersecurity" --location "United States" \
+    --window-days 30 \
+    --output /tmp/vc-pack-dashboard.html
+  ```
+
+- **On a non-zero exit** (no API key, or the API is unreachable — the normal
+  case on claude.ai / ChatGPT), take the **MCP path** below.
+
+When rendering the funding side early (step 6 above), pass only
+`--bucket funding_pull=<job_id>`, then `render.py --funding-pull
+raw/funding_pull.json --ma-pending …`.
+
+### MCP path (fallback — works on every platform)
+
+Pull each feed via the MCP (`pull_results`) and get the data to render.py in
+one of two ways; use the first that applies.
+
+#### Saved pull files (no re-emit)
 
 If your host auto-saves large MCP tool results to disk (some do for outputs
 above a token limit), pass those file paths straight in — nothing is re-typed.
@@ -420,7 +456,7 @@ python /path/to/skill/scripts/render.py \
   --output /tmp/vc-pack-dashboard.html
 ```
 
-### Otherwise — write a compact input.json
+#### Otherwise — write a compact input.json
 
 If the pulls didn't land on disk (claude.ai is the canonical case — MCP results
 stay in the model's context), write both feeds into one **compact, single-line
@@ -433,7 +469,7 @@ python /path/to/skill/scripts/render.py \
   --output /tmp/vc-pack-dashboard.html
 ```
 
-#### Minimal input.json schema — write ONLY these fields
+##### Minimal input.json schema — write ONLY these fields
 
 render.py reads a fixed, small set of fields. Drop everything else. In
 particular: no `record_id`, no `enrichment_confidence`, no `_domain`
@@ -515,8 +551,8 @@ per record) is fine and shorter to type.
 
 ### What render.py does after that
 
-Regardless of mode, render.py does all aggregation (FX conversion via
-`urllib` to open.er-api.com, deal stage buckets, sub-sectors, capital
+Regardless of path, render.py does all aggregation (FX conversion via
+fixed offline rates, deal stage buckets, sub-sectors, capital
 ratio, top-3 lists, mega rounds, row pre-rendering, minification). You
 do not compute aggregates in chat tokens.
 
@@ -602,21 +638,28 @@ echo "$DEST"
 ```
 
 Print to chat — a clean two-line header (no figlet), then the dashboard's
-**clickable blue link flanked by arrows** pointing in at it, so it's
-obviously the thing to click. The link is a real markdown `file://` link so
-it renders blue and cmd/ctrl+click-able (same mechanism as the footer links):
+**clickable blue link flanked by arrows**, with the equivalent open command on
+the next line. The link is a real markdown `file://` link so it renders blue
+and cmd/ctrl+click-able (same mechanism as the footer links); the command
+covers hosts that don't make links clickable — always print **both**, don't
+try to detect which kind of host you're in:
 
 **VC PACK** — <Market>
 funding + M&A · last <N> days
 
 The dashboard just opened in your browser — reopen it anytime:
 ▶▶▶ **[Open the dashboard](file://<ABSOLUTE path to the .html>)** ◀◀◀
+or run: `open <ABSOLUTE path to the .html>`
 
 - The open link **must be a markdown link with a `file://` URL + the absolute
   path** — note the three slashes (`file://` + the path's leading `/`), e.g.
   `file:///Users/you/.cache/vc-pack/dashboard-20260605-002841.html`.
   cmd/ctrl+click opens it in the browser. (The dashboard also already
-  auto-opened via the `open`/`xdg-open` step above — this is the re-open link.)
+  auto-opened via the `open`/`xdg-open` step above — the link and the command
+  are the re-open affordances.)
+- The `or run:` line uses the platform opener that worked above (`open` on
+  macOS, `xdg-open` on Linux, `start` on Windows) with the same absolute path,
+  in backticks so it's copyable.
 - Keep the `▶▶▶ … ◀◀◀` arrows tight around the link so it reads as the target.
   Link text is just **Open the dashboard** — no `↗` or other trailing glyph.
 - The `Full dataset:` block and the footer follow below.
@@ -662,7 +705,7 @@ user wants the dashboard, not a status report on render plumbing.
 - **Never web-search, `WebFetch`, verify, dedupe, or re-judge the records.**
   The dashboard renders CatchAll's raw output as-is. If a record looks off,
   that's CatchAll's product domain, not something to audit here.
-- Do not narrate polling, FX fetching, or render mechanics. The
+- Do not narrate polling, FX conversion, or render mechanics. The
   dashboard's run-stats strip and FX footer surface what users need to
   know about provenance.
 - Do not comment on match rate, candidate volume, runtime, validator

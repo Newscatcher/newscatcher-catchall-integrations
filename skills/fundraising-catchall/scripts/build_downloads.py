@@ -6,10 +6,10 @@ Shared and data-driven: per-event columns come from the records' own
 `enrichment` fields, so one script serves every single-list skill. The agent
 never re-writes this logic — it just runs this file.
 
-This script does NO network calls and uses NO API key. The agent pulls the
-records through the CatchAll **MCP** (`pull_results`), hands them to this script
-via `--input`, and the script only transforms them into files. (In Claude Code
-that means MCP-only — never a stored key; on claude.ai the same.)
+This script does NO network calls and uses NO API key itself — it only
+transforms records into files. The records reach `--input` either from the
+bundled `catchall_api.py` (API path — the pull fetched straight to disk) or
+from an MCP `pull_results` result the agent saves (MCP path).
 
   --input <file>   A JSON file holding the pulled records. Accepts the raw
                    `pull_results` output ({all_records, candidate_records,
