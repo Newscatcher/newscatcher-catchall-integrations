@@ -184,7 +184,18 @@ for inline JSON inspection or downstream processing.
 | List resources attached to a webhook | `list_webhook_resources` |
 | Remove a webhook from a resource | `remove_webhook_resource` |
 | View delivery history | `get_webhook_history` |
+| Manually trigger webhook delivery for a resource | `trigger_webhook` |
 | Delete a webhook | `delete_webhook` |
+
+**`trigger_webhook` — manual delivery:** Use `trigger_webhook` when you need to
+(re-)send a webhook delivery on demand — for example, to replay a missed or
+failed delivery without waiting for the next scheduled run. Required params:
+`webhook_id`, `resource_type` (`job`, `monitor`, or `monitor_group`), and
+`resource_id`. The optional `job_id` param specifies which run's payload to
+deliver (e.g., a specific monitor run); if omitted, the API picks the
+resource's own payload. The dispatch is **asynchronous** — `trigger_webhook`
+returns `{"success": true, "message": "Webhook trigger dispatched."}` immediately.
+Always follow up with `get_webhook_history` to confirm the delivery outcome.
 
 ### Datasets & Entities
 
@@ -570,7 +581,8 @@ Always explain what changed before resubmitting.
 | Dataset status not `ready` | Wait for enrichment to complete before attaching to a job |
 | Dataset `health_score` is low | Some entities failed enrichment — check `list_dataset_entities` for `status: failed` |
 | Monitor returning 0 results after previously returning N | Run `get_monitor_status` to see state history; check if the reference job's validators have become too strict for the current news cycle — resubmit the reference job and create a new monitor if needed |
-| Monitor webhook fails | Use `get_webhook_history` to diagnose; `update_monitor` or `update_webhook` to fix |
+| Monitor webhook fails | Use `get_webhook_history` to diagnose; if the delivery was missed, use `trigger_webhook` to replay it on demand; then `update_monitor` or `update_webhook` to fix the underlying issue |
+| Webhook delivery missed or needs replay | Use `trigger_webhook` with the webhook's ID and the target resource (`job`, `monitor`, or `monitor_group`); follow up with `get_webhook_history` to confirm the delivery outcome |
 | User wants to re-pull a past job | `list_user_jobs` to find the `job_id`, then `pull_results` |
 | User wants to re-pull a past job as CSV | `list_user_jobs` to find the `job_id`, then `pull_job_csv` |
 | User wants to share work with a teammate | Add resources to a project; teammates with access can filter by project |
