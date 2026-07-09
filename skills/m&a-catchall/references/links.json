@@ -1,0 +1,35 @@
+{
+  "_note": "Single source for every outward NewsCatcher link a skill carries. footer_links render in the chat footer + xlsx downloads; reference_links are the other URLs the shared docs/scripts embed inline — check-links.sh verifies every embedded copy matches this registry, so a moved URL is a one-file edit plus the locations the guard lists.",
+  "footer_links": [
+    {
+      "key": "monitors",
+      "label": "Run this on a schedule with Monitors",
+      "url": "https://www.newscatcherapi.com/docs/web-search-api/concepts/monitors",
+      "watchlist_only": false
+    },
+    {
+      "key": "watchlist",
+      "label": "Learn about Company Watchlists",
+      "url": "https://www.newscatcherapi.com/docs/web-search-api/concepts/company-search",
+      "watchlist_only": true
+    },
+    {
+      "key": "docs",
+      "label": "Docs",
+      "url": "https://www.newscatcherapi.com/docs/web-search-api/get-started/quickstart",
+      "watchlist_only": false
+    },
+    {
+      "key": "demo",
+      "label": "Book a demo",
+      "url": "https://www.newscatcherapi.com/book-a-demo",
+      "watchlist_only": false
+    }
+  ],
+  "reference_links": {
+    "mcp_setup": "https://www.newscatcherapi.com/docs/web-search-api/integrations/mcp",
+    "live_searches": "https://platform.newscatcherapi.com/catchall/searches",
+    "api_base": "https://catchall.newscatcherapi.com/catchAll"
+  },
+  "support_email": "support@newscatcherapi.com"
+}

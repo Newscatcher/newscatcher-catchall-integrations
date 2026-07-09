@@ -6,10 +6,10 @@ Shared and data-driven: per-event columns come from the records' own
 `enrichment` fields, so one script serves every single-list skill. The agent
 never re-writes this logic — it just runs this file.
 
-This script does NO network calls and uses NO API key. The agent pulls the
-records through the CatchAll **MCP** (`pull_results`), hands them to this script
-via `--input`, and the script only transforms them into files. (In Claude Code
-that means MCP-only — never a stored key; on claude.ai the same.)
+This script does NO network calls and uses NO API key itself — it only
+transforms records into files. The records reach `--input` either from the
+bundled `catchall_api.py` (API path — the pull fetched straight to disk) or
+from an MCP `pull_results` result the agent saves (MCP path).
 
   --input <file>   A JSON file holding the pulled records. Accepts the raw
                    `pull_results` output ({all_records, candidate_records,
@@ -55,6 +55,25 @@ def load_input(path: str) -> dict:
             "candidate_records": data.get("candidate_records", len(recs)),
             "valid_records": data.get("valid_records", len(recs)),
             "date_range": data.get("date_range") or {}}
+
+
+# --- links (single source: references/links.json) ----------------------------
+
+def load_links() -> dict:
+    """Load the single-source link table shipped next to the skill
+    (references/links.json). Fail loudly if absent — the footer URLs live in
+    exactly one place and are never reconstructed here."""
+    p = Path(__file__).resolve().parent.parent / "references" / "links.json"
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+def footer_links(links: dict, *, watchlist: bool):
+    """(label, url) pairs for the More-with-CatchAll footer, in order. The
+    Company Watchlists link is included only on watchlist runs."""
+    for link in links["footer_links"]:
+        if link.get("watchlist_only") and not watchlist:
+            continue
+        yield link["label"], link["url"]
 
 
 # --- record extraction (defensive across shapes) -----------------------------
@@ -153,16 +172,12 @@ def build_xlsx(meta: dict, events: list, enr_cols: list, path: Path) -> None:
     ov["A5"] = "More with CatchAll:"
     ov["A5"].font = Font(bold=True)
     row = 6
-    for label, url in (
-        ("Run on a schedule with Monitors",
-         "https://www.newscatcherapi.com/docs/web-search-api/guides-and-concepts/monitors"),
-        ("Docs", "https://www.newscatcherapi.com/docs/web-search-api/get-started/quickstart"),
-        ("Book a demo", "https://www.newscatcherapi.com/book-a-demo"),
-    ):
+    links = load_links()
+    for label, url in footer_links(links, watchlist=False):
         c = ov.cell(row, 1, label)
         c.hyperlink, c.font = url, LINK
         row += 1
-    ov.cell(row, 1, "Questions? support@newscatcherapi.com")
+    ov.cell(row, 1, f"Questions? {links['support_email']}")
 
     ri = wb.create_sheet("Run info")
     win = meta.get("window", {})

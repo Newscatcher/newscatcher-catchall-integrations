@@ -2,8 +2,8 @@
 
 Every run ends with a markdown **chat response** and three downloads — an
 **xlsx** workbook, a **JSON** file, and a **CSV** file — delivered together as
-one clean block (built up-front for normal-size results, offered for large
-ones; see § Downloads). The chat response is for reading; the xlsx is the
+one clean block (§ Downloads defines when they're built up-front vs
+offered). The chat response is for reading; the xlsx is the
 human-review artifact (Excel/Sheets); the JSON is the pipeline artifact; the
 CSV is the lightweight tabular interchange. This file defines the contract for
 those downloads and the chat layout; the skill's `SKILL.md` defines the
@@ -32,10 +32,53 @@ vs offer).
 
 The deliverable is **one uninterrupted block** — `## CatchAll findings` panel →
 event table → `Saved:` paths → footer — with **no tool activity between its
-parts.** Under MCP-only that means: **do the whole build first, silently, then
-write the block in one pass.** The records hand-off and the script run sit
-*above* the block as setup; they never land between the table and the `Saved:`
-paths, where they'd drown the links and the footer. By size:
+parts.** Do the whole build first, silently, then write the block in one pass.
+The records hand-off and the script run sit *above* the block as setup; they
+never land between the table and the `Saved:` paths, where they'd drown the
+links and the footer.
+
+**Build with the bundled `scripts/build_downloads.py` — never write a build
+script.** It does no network call itself; it only formats the records (columns
+are data-driven from the enrichment fields), and it installs `openpyxl` if
+missing and skips only a format it truly can't build (CSV/JSON always work) —
+no raw error, no narration. Both ways below put the pulled records on disk and
+run that same build. **Try the API path first; fall back to the MCP path when
+the environment can't use it. The fallback is automatic — a non-zero exit
+signals it — and silent: never mention which path ran in chat.**
+
+### API path (preferred)
+
+Once the job has completed, fetch the full results straight to disk. **Run this
+directly — do not check whether an API key exists first.** The script resolves
+the key itself (env / `.env` / MCP config) and signals the outcome by its exit
+code:
+
+```
+scripts/catchall_api.py --out-dir raw --bucket events=<job_id>
+```
+
+It writes `raw/events.json` (the verbatim pull) and prints a **compact digest**
+— one line per event, sorted most-cited first.
+
+- **On exit 0**, build (every run, regardless of size):
+
+  ```
+  python3 scripts/build_downloads.py --input raw/events.json --slug <slug>
+    --skill <name> --topic "<topic>" --start <YYYY-MM-DD> --end <YYYY-MM-DD>
+  ```
+
+  then write the `## CatchAll findings` panel and the event table **from the
+  digest** (its totals are the panel numbers) — do not re-open
+  `raw/events.json` for table rows.
+
+- **On a non-zero exit** (no API key, or the API is unreachable — the normal
+  case on claude.ai / ChatGPT), take the **MCP path** below.
+
+### MCP path (fallback — works on every platform)
+
+Pull the completed job with the MCP `pull_results` tool. Because the build
+script is bundled, the build is just a file write + a run — fast enough to
+finish before the table. By size:
 
 - **≤ ~100 records — build all three first, silently**, then render the full
   block at once. The files already exist when the table appears, so the
@@ -50,12 +93,6 @@ before it — negligible against a multi-minute search, and it keeps the panel,
 table, links, and footer **together** instead of split by build noise. (~100 =
 tunable cap.)
 
-**Build with the bundled `scripts/build_downloads.py` — never write a build
-script.** It does **no network call and uses no API key**: you pull the records
-through the **MCP** (`pull_results`); the script only formats them (columns are
-data-driven from the enrichment fields). Because the script is bundled, the
-build is just a file write + a run — fast enough to finish before the table.
-
 1. Save the `pull_results` output to `records.json` **as compact, single-line
    JSON** (no indentation — `json.dumps(obj)` with no `indent`). This keeps the
    hand-off **one line** in the transcript, not hundreds. (If the host already
@@ -64,9 +101,6 @@ build is just a file write + a run — fast enough to finish before the table.
    --skill <name> --topic "<topic>" --start <YYYY-MM-DD> --end <YYYY-MM-DD>`
 3. Read its stdout for the file paths, then render the block with the `Saved:`
    paths already in place.
-
-It installs `openpyxl` if missing and skips only a format it truly can't build
-(CSV/JSON always work) — no raw error, no narration.
 
 **Surface the built files per environment:**
 - **Local working-dir** (Claude Code / Cursor): a `Saved:` block — absolute

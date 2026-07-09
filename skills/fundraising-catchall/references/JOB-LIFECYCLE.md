@@ -158,9 +158,13 @@ one more capped wait.
    varies by host, so match on the `CatchAll`/`catchall` substring — e.g.
    `mcp__claude_ai_CatchAll__get_user_limits` (claude.ai) or
    `mcp__catchall__get_user_limits` (a local config). If none exists, tell the
-   user the CatchAll MCP isn't connected and stop — do not substitute curl.
+   user the CatchAll MCP isn't connected and point them to the setup guide —
+   `https://www.newscatcherapi.com/docs/web-search-api/integrations/mcp` (it
+   covers getting an API key too) — then stop. Do not substitute curl.
 2. **API key set?** Call that `get_user_limits` tool. If it returns
-   `Error: API key is required.`, tell the user to set a key and stop.
+   `Error: API key is required.`, point the user to that same setup guide
+   (`https://www.newscatcherapi.com/docs/web-search-api/integrations/mcp`) to
+   add their key, and stop.
 3. **Dates valid?** Set `end_date` to **today** (the API rejects a future
    `end_date`) and `start_date` to today − (window − 1), within the plan's
    lookback — get them right on the **first** submit. Do this **silently**:
@@ -200,5 +204,5 @@ renamed field is rejected as "invalid tool parameters" (the CatchAll MCP has
   `connected_dataset_ids`. Validators are type `boolean` only; enrichment
   `type` is one of `text` / `number` / `date` / `option` / `url` / `company`.
 
-There is no HTTP fallback — if the MCP isn't available, stop per
-pre-flight; never substitute raw HTTP calls.
+If the MCP isn't available, stop per pre-flight — never hand-write your
+own HTTP calls in place of these tools.

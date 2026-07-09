@@ -1162,10 +1162,15 @@ def write_data_files(meta, funding, ma, out_prefix, ma_pending=False):
     ov["A2"] = f"{meta.get('window_days', '?')}-day window · raw dataset behind the dashboard"
     ov["A4"] = "Funding = capital into the market; M&A = capital out. One row per record on each sheet."
     ov["A6"] = "More with CatchAll:"
-    ov["A7"] = "Run on a schedule with Monitors — https://www.newscatcherapi.com/docs/web-search-api/guides-and-concepts/monitors"
-    ov["A8"] = "Docs — https://www.newscatcherapi.com/docs/web-search-api/get-started/quickstart"
-    ov["A9"] = "Book a demo — https://www.newscatcherapi.com/book-a-demo"
-    ov["A10"] = "Questions? support@newscatcherapi.com"
+    links_path = Path(__file__).resolve().parent.parent / "references" / "links.json"
+    links = json.loads(links_path.read_text(encoding="utf-8"))
+    _row = 7
+    for link in links["footer_links"]:
+        if link.get("watchlist_only"):
+            continue  # vc-pack is not a watchlist skill
+        ov[f"A{_row}"] = f"{link['label']} — {link['url']}"
+        _row += 1
+    ov[f"A{_row}"] = f"Questions? {links['support_email']}"
 
     navy = PatternFill("solid", fgColor="1F3A5F")
     white = Font(color="FFFFFF", bold=True)

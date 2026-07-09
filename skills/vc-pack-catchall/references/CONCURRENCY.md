@@ -96,7 +96,7 @@ entirely when everything ran in one wave.
 
 ### Checkpoints — re-render at intervals while it runs
 
-Every ~30 min it's still going, re-render the same table plus two columns,
+Every ~15 min it's still going, re-render the same table plus two columns,
 `Web pages scanned` and `Events found`, filled for any non-Queued row from
 `candidate_records` / `valid_records` on `get_job_status` (no full pull needed).
 Keep the copy **neutral and un-alarmed** — never "slow," "taking longer than

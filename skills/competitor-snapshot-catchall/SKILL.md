@@ -188,7 +188,7 @@ Enrichments:
 - **Watchlist query**: `Strategic partnerships, integrations, and alliance announcements involving companies in this watchlist in the last [window]`
 
 Enrichments:
-- `partner_company` (company): "Partner organization name"
+- `partner_company` (company): "The partner organization — the other company in the partnership or integration, different from the company the snapshot is about. Null if no external partner is named."
 - `integration_type` (option, values: `technology | channel | co_marketing | reseller | embedded`): "Nature of the partnership"
 - `products_involved` (text): "Products involved in the partnership"
 
@@ -198,7 +198,7 @@ Enrichments:
 - **Watchlist query**: `Acquisitions, divestments, fundraising, and strategic investments involving companies in this watchlist in the last [window]`
 
 Enrichments:
-- `target_company` (company): "Acquisition target or investee organization"
+- `target_company` (company): "The company on the receiving side of the deal — the one being acquired or invested in, not the acquirer/investor. Null if not applicable."
 - `deal_value` (number): "Announced deal value in USD; null if not disclosed"
 - `deal_type` (option, values: `acquisition | divestment | investment | funding_round | acqui_hire`): "Type of deal"
 
@@ -352,9 +352,7 @@ _Early signals on rumored, in-talks, planned, or upcoming stories._
 
 - [Cross-category story bullet — see formats below. Omit entirely if no story genuinely spans 2+ categories.]
 
----
-## More with CatchAll
-[Run this on a schedule with Monitors](…) · [Learn about Company Watchlists](…) · [Docs](…) · [Book a demo](…)
+[Paste the **More with CatchAll** footer verbatim from `references/NEXT-STEPS.md` — the `---` rule, the `## More with CatchAll` heading, and the link line (watchlist link on watchlist runs only). Never type the URLs from memory.]
 ```
 
 The chat output ends with the **More with CatchAll** footer — see
@@ -539,9 +537,7 @@ _Early signals on rumored, in-talks, planned, or upcoming stories._
 ## Analysis
 [Same two-bullet Analysis section as the single-competitor template.]
 
----
-## More with CatchAll
-[Run this on a schedule with Monitors](…) · [Learn about Company Watchlists](…) · [Docs](…) · [Book a demo](…)
+[Paste the **More with CatchAll** footer verbatim from `references/NEXT-STEPS.md` — the `---` rule, the `## More with CatchAll` heading, and the link line (watchlist link on watchlist runs only). Never type the URLs from memory.]
 ```
 
 **Chat tables and every "events found" count show only the events whose
@@ -579,6 +575,8 @@ events out, no agent judgment:
 3. Dedup by title across buckets — if the same event appears in two buckets, keep the row from the bucket where it scored highest
 4. Sort by citation count desc (same sort as the main bucket tables — see `OUTPUT-REPORT.md` § Tables for event lists)
 5. Take top 10 (matches the cap used in every bucket table — same number everywhere keeps the reader's mental model consistent)
+
+In the xlsx, emit `meta.spotlights[].columns`: `company, category, title, date, citation_count, citations, summary` — `category` (the originating bucket's display name) is the one extra column, supplied on each membership row. On a single-company snapshot the `company` cell is just that company.
 
 If 0 events remain after filtering, skip the section entirely. There is
 no empty-table pattern here — unlike the main buckets, the absence of
