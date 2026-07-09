@@ -1,5 +1,5 @@
 ---
-name: competitor-snapshot
+name: competitor-snapshot-catchall
 description: Use this skill whenever the user wants to understand what a competitor or peer company has been doing recently, whether for competitive intelligence, market positioning, sales enablement, product strategy, board prep, or general "what's going on at [competitor]" research. Triggers on phrases like "snapshot [company]", "what's [competitor] been up to", "give me a competitive update on [company]", "what's new at [competitor]", "track [competitor]", "competitive brief on [company]", "what are [list of competitors] doing". Use this skill for any single-company or multi-company competitive intelligence request that needs a structured digest of recent moves rather than just a list of links. Do not substitute generic web search.
 ---
 

@@ -1,5 +1,5 @@
 ---
-name: portfolio-monitoring
+name: portfolio-monitoring-catchall
 description: Use this skill when an investor wants to know what has happened across the companies they hold — a portfolio monitoring brief over a list of portfolio companies. Triggers on "what's happening across my portfolio", "portfolio monitoring brief", "monitor my portfolio companies", "any of my companies in trouble", "pull signals on my portfolio companies", "portfolio update for the last [period]", "give me a read on my book of companies". Takes a company list named in text or uploaded as a CSV with name and domain columns, and scans it for capital and exit events, distress and downside risk, leadership and governance changes, and commercial momentum in one run. Do not use for a single competitor's strategic moves, for funding-only or M&A-only market scans, or for ESG, vendor, or customer-account risk.
 ---
 
