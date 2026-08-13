@@ -151,6 +151,13 @@ CSV file. Use `pull_results` when you need paginated JSON (e.g., to display
 results inline or pass them to a downstream tool that expects structured JSON).
 `pull_job_csv` requires the job to be in `completed` status.
 
+**`list_user_jobs` filters:** In addition to `page`/`page_size`, `list_user_jobs`
+accepts `search` (text filter on the job query), `ownership` (`all`, `own`, or
+`shared`), `project_id` (filter to a specific project), and `mode` (`base` or
+`lite`). Use `mode` when you want to list only jobs submitted in a specific
+processing mode — for example, to audit which jobs ran in `lite` mode or to
+separate cost-optimised runs from full-enrichment runs.
+
 ### Monitors
 
 | Task | Tool |
@@ -187,6 +194,13 @@ for inline JSON inspection or downstream processing.
 | Manually trigger webhook delivery for a resource | `trigger_webhook` |
 | Delete a webhook | `delete_webhook` |
 
+**`create_webhook` — project association:** Pass the optional `project_id`
+parameter to attach the webhook to a project immediately on creation. This is
+equivalent to calling `add_project_resources` afterwards with
+`resource_type="webhook"`, but saves a round-trip. A webhook can belong to
+several projects at once; use `add_project_resources` to attach it to
+additional projects later.
+
 **`trigger_webhook` — manual delivery:** Use `trigger_webhook` when you need to
 (re-)send a webhook delivery on demand — for example, to replay a missed or
 failed delivery without waiting for the next scheduled run. Required params:
@@ -196,6 +210,20 @@ deliver (e.g., a specific monitor run); if omitted, the API picks the
 resource's own payload. The dispatch is **asynchronous** — `trigger_webhook`
 returns `{"success": true, "message": "Webhook trigger dispatched."}` immediately.
 Always follow up with `get_webhook_history` to confirm the delivery outcome.
+
+**`get_webhook_history` — two query modes:** Call this tool in exactly one of
+two modes per call — mixing parameters from both modes raises a validation error:
+
+| Mode | Parameters to pass | What you get |
+|---|---|---|
+| **Resource mode** | `resource_type` + `resource_id` | All deliveries made for a specific job, monitor, or monitor_group |
+| **Webhook mode** | `webhook_id` | Every delivery made through one webhook, across all resources |
+
+Webhook mode is the **only** place manual test deliveries (from `test_webhook`)
+appear — they are recorded with `resource_type: "test"` and are not tied to any
+job or monitor. Use webhook mode when diagnosing a specific endpoint's delivery
+history or auditing test calls. Use resource mode when diagnosing why a specific
+job or monitor did or did not deliver.
 
 ### Datasets & Entities
 
@@ -221,10 +249,22 @@ Always follow up with `get_webhook_history` to confirm the delivery outcome.
 | Create a project | `create_project` |
 | List all projects | `list_projects` |
 | Get resource summary for a project | `get_project_overview` |
-| Add jobs / monitors / datasets to a project | `add_project_resources` |
+| Add jobs / monitors / datasets / webhooks to a project | `add_project_resources` |
 | List resources inside a project | `list_project_resources` |
 | Remove a resource from a project | `remove_project_resource` |
 | Update or delete a project | `update_project` / `delete_project` |
+
+**Project `resource_type` values:** `job`, `monitor`, `dataset`, `monitor_group`,
+or `webhook`. Webhooks are first-class project resources — a webhook can belong
+to several projects at once. When you call `add_project_resources`,
+`list_project_resources`, or `remove_project_resource`, pass
+`resource_type="webhook"` to manage webhook membership.
+
+**`delete_project` and webhooks:** Deleting a project (with or without
+`delete_resources=true`) **never deletes webhooks** — it only detaches them.
+The response's `deleted_resources` map includes a `webhook_unlinked` count
+showing how many webhooks were detached. Detached webhooks continue to exist
+and remain attached to any other projects or resources they belong to.
 
 ### Utilities
 
@@ -246,6 +286,9 @@ Pass `mode` in `submit_query`:
 
 Use `lite` when the user just wants to know if something happened and doesn't
 need specific fields extracted. Use `base` for any structured output.
+
+The same `base`/`lite` values are accepted by `list_user_jobs` as a `mode`
+filter to narrow the listing to jobs that ran in a specific processing mode.
 
 ---
 
@@ -439,7 +482,8 @@ Always test before attaching.
 
 **Setup workflow:**
 
-1. `create_webhook` — register the endpoint (name, url, type, auth)
+1. `create_webhook` — register the endpoint (name, url, type, auth). Pass
+   `project_id` if you want the webhook associated with a project from the start.
 2. `test_webhook` — verify it receives a payload correctly
 3. `assign_webhook_resource` — attach the webhook to a job or monitor
 
@@ -463,7 +507,7 @@ automatically — no extra steps needed after `assign_webhook_resource`.
 
 ## Projects: organizing work
 
-Projects group related jobs, monitors, and datasets together. Use them when:
+Projects group related jobs, monitors, datasets, and webhooks together. Use them when:
 
 - The user is running multiple related queries (e.g., "all my competitive intelligence work")
 - Multiple team members share a workspace and need to filter by initiative
@@ -472,13 +516,16 @@ Projects group related jobs, monitors, and datasets together. Use them when:
 **Workflow:**
 
 1. `create_project` — give it a name and description
-2. Submit jobs / create monitors / build datasets as usual
+2. Submit jobs / create monitors / build datasets / create webhooks as usual
 3. `add_project_resources` — attach completed resources to the project
+   (`resource_type` is one of: `job`, `monitor`, `dataset`, `monitor_group`, `webhook`)
 4. `get_project_overview` — see counts by resource type and status
 
 Projects are organizational only — they don't affect job processing or billing.
 Deleting a project with `delete_resources: false` (the default) leaves all
-resources intact.
+resources intact. Even with `delete_resources: true`, webhooks are **never**
+deleted — they are only detached from the project. The `deleted_resources` map
+in the response includes a `webhook_unlinked` count for detached webhooks.
 
 ---
 
@@ -494,8 +541,9 @@ sequence:
    relevant. Refine query, validators, or enrichments if needed. Repeat until
    the user is satisfied.
 3. **Create a webhook** — `create_webhook` with the delivery destination
-   (Slack, Teams, or a generic URL). Run `test_webhook` to confirm it receives
-   payloads before wiring it up.
+   (Slack, Teams, or a generic URL). Pass `project_id` if the webhook should be
+   associated with a project immediately. Run `test_webhook` to confirm it
+   receives payloads before wiring it up.
 4. **Create a monitor** — `create_monitor` using the completed job as
    `reference_job_id`, with the user's requested schedule and the webhook's
    `id` passed in `webhook_ids`.
@@ -581,9 +629,13 @@ Always explain what changed before resubmitting.
 | Dataset status not `ready` | Wait for enrichment to complete before attaching to a job |
 | Dataset `health_score` is low | Some entities failed enrichment — check `list_dataset_entities` for `status: failed` |
 | Monitor returning 0 results after previously returning N | Run `get_monitor_status` to see state history; check if the reference job's validators have become too strict for the current news cycle — resubmit the reference job and create a new monitor if needed |
-| Monitor webhook fails | Use `get_webhook_history` to diagnose; if the delivery was missed, use `trigger_webhook` to replay it on demand; then `update_monitor` or `update_webhook` to fix the underlying issue |
+| Monitor webhook fails | Use `get_webhook_history` (resource mode: `resource_type` + `resource_id`) to diagnose; if the delivery was missed, use `trigger_webhook` to replay it on demand; then `update_monitor` or `update_webhook` to fix the underlying issue |
 | Webhook delivery missed or needs replay | Use `trigger_webhook` with the webhook's ID and the target resource (`job`, `monitor`, or `monitor_group`); follow up with `get_webhook_history` to confirm the delivery outcome |
+| Need to audit all deliveries through one webhook endpoint | Use `get_webhook_history` in webhook mode: pass `webhook_id` only (no `resource_type`/`resource_id`) |
+| Manual test delivery not appearing in resource history | Test deliveries only appear in webhook-mode history (`webhook_id` param); they are recorded with `resource_type: "test"` |
 | User wants to re-pull a past job | `list_user_jobs` to find the `job_id`, then `pull_results` |
 | User wants to re-pull a past job as CSV | `list_user_jobs` to find the `job_id`, then `pull_job_csv` |
+| User wants to list only lite-mode jobs | `list_user_jobs` with `mode="lite"` |
 | User wants to share work with a teammate | Add resources to a project; teammates with access can filter by project |
 | Connected dataset query returns too many irrelevant results | Verify query describes the topic only (not the entity list); check that entity-relevance validators are not being passed manually — the API generates them automatically |
+| User deletes a project and asks why webhooks are still active | `delete_project` never deletes webhooks — it only detaches them; `deleted_resources.webhook_unlinked` shows the count of detached webhooks |
