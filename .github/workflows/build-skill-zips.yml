@@ -1,0 +1,51 @@
+name: Build skill zips
+
+# Claude installs a skill from a zipped skill folder, and GitHub cannot download
+# a single folder. This builds one zip per skill on every push to main and keeps
+# them on a rolling `skills-latest` release, so the docs can link a stable URL:
+#
+#   https://github.com/Newscatcher/newscatcher-catchall-integrations/releases/download/skills-latest/<skill>.zip
+
+on:
+  push:
+    branches: [main]
+    paths: ['skills/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build one zip per skill
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for dir in skills/*/; do
+            name="$(basename "$dir")"
+            if [ ! -f "$dir/SKILL.md" ]; then
+              echo "skipping $name (no SKILL.md)"
+              continue
+            fi
+            ( cd skills && zip -qr "../dist/$name.zip" "$name" \
+                -x '*/__pycache__/*' '*.pyc' '*/.DS_Store' )
+            echo "built $name.zip"
+          done
+          ls -lh dist
+
+      - name: Publish to the rolling release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view skills-latest >/dev/null 2>&1; then
+            gh release upload skills-latest dist/*.zip --clobber
+          else
+            gh release create skills-latest dist/*.zip \
+              --title "Skills (latest)" \
+              --notes "One prebuilt zip per skill, rebuilt on every push to main. Download a zip and upload it to claude.ai as a skill."
+          fi
