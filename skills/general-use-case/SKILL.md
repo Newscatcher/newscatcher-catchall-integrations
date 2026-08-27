@@ -201,6 +201,11 @@ equivalent to calling `add_project_resources` afterwards with
 several projects at once; use `add_project_resources` to attach it to
 additional projects later.
 
+**`list_webhooks` — project filter:** Pass the optional `project_id` parameter
+to filter the listing to only webhooks belonging to a specific project. This
+mirrors the same filter available on `list_user_jobs`, `list_monitors`, and
+`list_datasets`.
+
 **`trigger_webhook` — manual delivery:** Use `trigger_webhook` when you need to
 (re-)send a webhook delivery on demand — for example, to replay a missed or
 failed delivery without waiting for the next scheduled run. Required params:
@@ -242,6 +247,30 @@ job or monitor did or did not deliver.
 | List all datasets | `list_datasets` |
 | Delete a dataset (entities are preserved) | `delete_dataset` |
 
+**`list_entities` — project filter:** Pass the optional `project_id` parameter
+to filter the listing to only entities belonging to a specific project. This
+mirrors the same filter available on `list_user_jobs`, `list_monitors`,
+`list_datasets`, and `list_webhooks`.
+
+### Source Groups
+
+| Task | Tool |
+|---|---|
+| List available named source-domain allowlists | `list_source_groups` |
+
+**Source groups** are reusable, named sets of source domains maintained by
+NewsCatcher. `list_source_groups` returns public groups plus any
+organization-visibility groups your organization can access. Each item has a
+`slug`, `name`, and `description`. Supports optional `page`/`page_size`
+pagination (max `page_size`: 500).
+
+Use `list_source_groups` when the user wants to scope a query to a specific set
+of domains (e.g., only tier-1 financial outlets, only government sources). Once
+you have the group's `slug`, pass it via the `source_groups` field on the direct
+`POST /catchAll/submit` API call. **Note:** `submit_query` (the MCP tool) does
+not yet expose a `source_groups` parameter — use the direct API for this until
+a future release adds it.
+
 ### Projects
 
 | Task | Tool |
@@ -272,6 +301,20 @@ and remain attached to any other projects or resources they belong to.
 |---|---|
 | Check credit usage and plan limits | `get_user_limits` |
 | Check API health | `check_health` |
+
+---
+
+## Error handling
+
+All tools raise a real MCP tool error (`isError=True`) for any upstream non-2xx
+response (bad `api_key`, invalid or foreign `project_id`, not-found IDs,
+validation failures, etc.) or unhandled exception. The error message carries the
+upstream status code and message — for example, `API Error (401): Api key not
+found`. **Do not** rely on parsing the result text for `"Error: ..."` strings —
+check `isError` on the tool call result.
+
+Legitimate 2xx responses with an empty body (e.g., a 204 delete, or a
+zero-result list) are **not** errors — that path is unaffected.
 
 ---
 
@@ -633,9 +676,11 @@ Always explain what changed before resubmitting.
 | Webhook delivery missed or needs replay | Use `trigger_webhook` with the webhook's ID and the target resource (`job`, `monitor`, or `monitor_group`); follow up with `get_webhook_history` to confirm the delivery outcome |
 | Need to audit all deliveries through one webhook endpoint | Use `get_webhook_history` in webhook mode: pass `webhook_id` only (no `resource_type`/`resource_id`) |
 | Manual test delivery not appearing in resource history | Test deliveries only appear in webhook-mode history (`webhook_id` param); they are recorded with `resource_type: "test"` |
+| Tool call returns `isError=True` | Read the error message — it carries the upstream status code and detail (e.g. `API Error (401): Api key not found`). Do not retry blindly; fix the root cause (bad API key, invalid project_id, not-found ID) first |
 | User wants to re-pull a past job | `list_user_jobs` to find the `job_id`, then `pull_results` |
 | User wants to re-pull a past job as CSV | `list_user_jobs` to find the `job_id`, then `pull_job_csv` |
 | User wants to list only lite-mode jobs | `list_user_jobs` with `mode="lite"` |
 | User wants to share work with a teammate | Add resources to a project; teammates with access can filter by project |
 | Connected dataset query returns too many irrelevant results | Verify query describes the topic only (not the entity list); check that entity-relevance validators are not being passed manually — the API generates them automatically |
 | User deletes a project and asks why webhooks are still active | `delete_project` never deletes webhooks — it only detaches them; `deleted_resources.webhook_unlinked` shows the count of detached webhooks |
+| User wants to scope a job to specific domains | Use `list_source_groups` to find the relevant group's `slug`, then pass it via `source_groups` on the direct `POST /catchAll/submit` API; `submit_query` (MCP tool) does not yet expose this parameter |
