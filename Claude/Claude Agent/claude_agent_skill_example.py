@@ -42,7 +42,7 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 
 # Path to the general-use-case Skill
 SKILL_PATH = (
-    Path(__file__).parent / ".." / ".." / "skills" / "general-use-case" / "SKILL.md"
+    Path(__file__).parent / ".." / ".." / "skills" / "general-use-case-catchall" / "SKILL.md"
 )
 
 # Initialize Anthropic client

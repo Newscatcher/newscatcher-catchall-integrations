@@ -160,11 +160,12 @@ Each skill and integration is self-contained. Navigate to its folder and follow 
 ```
 newscatcher-catchall-integrations/
 ├── skills/
-│   ├── general-use-case/              # Core CatchAll skill (jobs, monitors, webhooks, datasets)
-│   ├── competitor-snapshot-catchall/  # Competitive intelligence skill
-│   ├── fundraising-catchall/          # Funding round tracking skill
-│   ├── m&a-catchall/                  # M&A deal tracking skill
-│   └── vc-pack-catchall/              # Combined funding + M&A market dashboard skill
+│   ├── general-use-case-catchall/          # Core CatchAll skill (jobs, monitors, webhooks, datasets)
+│   ├── competitor-snapshot-catchall/       # Competitive intelligence skill
+│   ├── fundraising-catchall/               # Funding round tracking skill
+│   ├── mergers-and-acquisitions-catchall/  # M&A deal tracking skill
+│   ├── portfolio-monitoring-catchall/      # Portfolio company monitoring skill
+│   └── vc-pack-catchall/                   # Combined funding + M&A market dashboard skill
 ├── Claude/
 │   └── Claude Agent/                  # Anthropic Claude API integration
 ├── crew_ai/
