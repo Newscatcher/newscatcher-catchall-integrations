@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build the xlsx + JSON + CSV downloads for a single-list CatchAll run
-(fundraising, M&A, and any single-query event skill).
+(fundraising-catchall, mergers-and-acquisitions-catchall, and any single-query
+event skill).
 
 Shared and data-driven: per-event columns come from the records' own
 `enrichment` fields, so one script serves every single-list skill. The agent
