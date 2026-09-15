@@ -4,6 +4,25 @@ All notable changes to this repository are documented here.
 
 ---
 
+## [2026-08-24]
+
+### Skills: folder names fixed so the skills can be installed
+Two skill folders had names that broke installation. The Claude skill uploader
+rejects `&` in a folder name, and it fails the whole upload rather than the one
+skill, so no skill in this repo could be installed. A folder whose name does not
+match its own `name:` frontmatter fails on its own.
+
+- `m&a-catchall` to `mergers-and-acquisitions-catchall`: removes the `&`, and
+  matches the name `general-use-case-catchall` already points at
+- `general-use-case` to `general-use-case-catchall`: folder now matches its own
+  `name: general-use-case-catchall` frontmatter
+- `SKILL_PATH` in `Claude/Claude Agent/claude_agent_skill_example.py` repointed
+  to `skills/general-use-case-catchall/SKILL.md`
+- `README.md` repository structure updated for both renames, and
+  `portfolio-monitoring-catchall/` added (it was missing from the tree)
+
+---
+
 ## [2026-06-15]
 
 ### Skills — folder renames (all use-case skills now have `-catchall` suffix)
