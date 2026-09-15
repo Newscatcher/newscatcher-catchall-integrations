@@ -20,8 +20,8 @@ Every run produces, at minimum:
 | `<slug>.json` | Full hierarchical dataset with metadata. Pipeline-native | Scripting / programmatic ingestion |
 | `<slug>.csv` | Flattened tabular view, one row per event | Tools that don't speak JSON (BI, R, pandas, Numbers) |
 
-Where `<slug>` is `<entity-or-topic-slug>-<skill-name>`, lowercase,
-hyphenated. Examples:
+Where `<slug>` is `<entity-or-topic-slug>-<skill-name>`, lowercase, hyphenated,
+dropping the skill name's `-catchall` suffix. Examples:
 
 - `atlassian-competitor-snapshot.xlsx` / `.json` / `.csv`
 - `apple-supply-chain.xlsx` / `.json` / `.csv`
@@ -77,7 +77,8 @@ spotlights and fill the manifest.
 {
   "meta": { "entity": "…", "window": {"start":"YYYY-MM-DD","end":"YYYY-MM-DD"},
             "prepared_at": "<ISO 8601 UTC>", "skill": "…", "mode": "base",
-            "company_count": "<N — watchlist runs>" },
+            "company_count": "<N — watchlist runs>",
+            "aggregate_counts": ["<enrichment name — optional>"] },
   "bucket_order": ["<bucket_key>", "…"],
   "spotlights_meta": [ { "key":"…", "name":"…", "subtitle":"…", "columns":[…] } ],
   "spotlights": { "<key>": [ { "record_id":"<from the digest>", "<extra col>":"<value>" } ] }
@@ -89,7 +90,10 @@ spotlights and fill the manifest.
 and the top-level `spotlights` of the JSON shape below — except membership
 references the raw **`record_id`** (from the digest) instead of `event_id`, and
 carries only the non-base columns. Titles, dates, summaries, citations, and
-watchlist attribution all come from the raw records.
+watchlist attribution all come from the raw records. (On watchlist runs the
+summary is the entity relation; a non-watchlist skill defines a `summary`
+enrichment instead — the builder maps it into each event's summary and drops
+it from the enrichment columns.)
 
 ### MCP path (fallback — works on every platform)
 
@@ -118,7 +122,10 @@ the dashboard numbers, each bucket's events (already sorted, each with a prebuil
 **resolved**. **Read `raw/digest.json` and build the chat report from it. It is
 authoritative — do not recompute anything, and do not re-open the JSON/CSV to
 pull table rows or resolve spotlight ids.** Every value you need is already
-there, so you write no ad-hoc extraction code.
+there, so you write no ad-hoc extraction code. If the manifest's meta lists
+`aggregate_counts`, the digest adds `aggregates.<field>` — that enrichment's
+value counts across all events, sorted by count — read per-value totals from
+it rather than counting rows.
 
 ## The "Full dataset" block
 
@@ -320,7 +327,9 @@ spotlight table.
   no empty-table pattern — the absence of qualifying events is not itself
   a finding to show.
 - **Sort** by citation count descending by default (matches the bucket
-  tables); a spotlight may set its own sort key (e.g. a severity tier).
+  tables); a spotlight may set its own sort key (e.g. a severity tier, a
+  date). Apply that sort when you build the membership list — the
+  renderer preserves the order you emit and never re-sorts it.
 - **Cap** at 10 rows in chat by default; if more qualify, append one
   trailing `(K more — … in the full dataset)` line.
 - **Grain is the spotlight's choice** — one row per **event** (e.g. a

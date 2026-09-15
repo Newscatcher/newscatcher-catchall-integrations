@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render the multi-section report downloads (xlsx + JSON + CSV) for a CatchAll
-report skill (competitor-snapshot, portfolio-monitoring, and any sectioned,
-bucketed skill).
+report skill (competitor-snapshot-catchall, portfolio-monitoring-catchall, and
+any sectioned, bucketed skill).
 
 The agent produces the structured report JSON — meta + events-by-bucket +
 spotlights — because that shaping needs skill judgment. This script then
@@ -84,14 +84,25 @@ def _enrichment_types(pull: dict) -> dict:
     return {e["name"]: e.get("type") for e in (pull.get("enrichments") or [])}
 
 
+def _company_value(v):
+    """A company-type value is {source_text, confidence, metadata:{name, domain_url}}.
+    `metadata.name` is the CANONICAL resolved company name; `source_text` is only the
+    matched text span, which is routinely a whole sentence ("Operated by EDF, the plant
+    has been generating electricity since 1995"). Take the resolved name, falling back
+    to the span when resolution returned none — never invent, never drop."""
+    if not isinstance(v, dict):
+        return v
+    return (v.get("metadata") or {}).get("name") or v.get("source_text")
+
+
 def _extract_enrichments(raw_enr: dict, types: dict) -> dict:
-    """Copy each declared enrichment verbatim. A company-type value arrives as an
-    object {source_text, metadata:{name}} — take source_text. Scalars pass
-    through. enrichment_confidence and anything not in the schema is dropped."""
+    """Copy each declared enrichment verbatim, resolving company-type objects to the
+    company name. Scalars pass through. enrichment_confidence and anything not in the
+    schema is dropped."""
     out = {}
     for name, typ in types.items():
         v = raw_enr.get(name)
-        out[name] = (v.get("source_text") if isinstance(v, dict) else v) if typ == "company" else v
+        out[name] = _company_value(v) if typ == "company" else v
     return out
 
 
@@ -118,17 +129,23 @@ def _event_from_record(record: dict, types: dict) -> dict:
         cits.append({"source": domain_of(url), "url": url,
                      "published_date": (c.get("published_date") or "")})
     date = cits[0]["published_date"][:10] if cits and cits[0]["published_date"] else None
-    return {
+    enr = _extract_enrichments(record.get("enrichment") or {}, types)
+    # raw has no native summary field: watchlist records use the entity relation
+    # (verbatim); otherwise a skill-defined `summary` enrichment fills it. Either
+    # way the summary never doubles as an enrichment column.
+    summary = relation or (enr.pop("summary", None) or "")
+    ev = {
         "id": str(record.get("record_id")),
         "title": record.get("record_title", ""),
         "date": date,
-        "summary": relation,   # raw has no summary field; use the entity relation (verbatim)
-        "company": company,
-        "ed_score": ed_score,
-        "relation": relation,
+        "summary": summary,
         "citations": cits,
-        "enrichments": _extract_enrichments(record.get("enrichment") or {}, types),
+        "enrichments": enr,
     }
+    if company or relation or ed_score != "":
+        # watchlist attribution — non-watchlist records carry no entity fields
+        ev["company"], ev["ed_score"], ev["relation"] = company, ed_score, relation
+    return ev
 
 
 def extract_from_raw(raw_dir: str):
@@ -212,7 +229,7 @@ def cell(v):
 
 
 def run_is_watchlist(events: dict) -> bool:
-    return any(k in e for evs in events.values() for e in evs
+    return any(e.get(k) not in (None, "") for evs in events.values() for e in evs
                for k in ("company", "ed_score", "relation"))
 
 
@@ -239,7 +256,8 @@ def row_values(e: dict, cols: list, extra: dict) -> list:
     c = cites(e)
     base = {
         "title": e.get("title", ""),
-        "company": e.get("company", ""),
+        # non-watchlist skills carry the company as an enrichment instead
+        "company": e.get("company") or (e.get("enrichments") or {}).get("company") or "",
         "date": e.get("date") or "",
         "ed_score": e.get("ed_score", ""),
         "citation_count": len(c),
@@ -280,11 +298,16 @@ def _source_str(c: list) -> str:
 
 def _event_digest(e: dict, has_wl: bool) -> dict:
     c = cites(e)
+    enr = e.get("enrichments") or {}
     d = {"title": e.get("title", ""), "date": e.get("date") or "",
-         "sources": _source_str(c), "citation_count": len(c),
-         "enrichments": e.get("enrichments") or {}}
+         "sources": _source_str(c), "citation_count": len(c), "enrichments": enr}
+    # company: watchlist attribution when there is one, else the company enrichment —
+    # same resolution row_values uses, so the digest and the sheets agree
+    company = e.get("company") or enr.get("company") or ""
+    if company:
+        d["company"] = company
     if has_wl:
-        d["company"], d["ed_score"] = e.get("company", ""), e.get("ed_score", "")
+        d["ed_score"] = e.get("ed_score", "")
     return d
 
 
@@ -312,15 +335,32 @@ def chat_digest(meta: dict, events: dict, spotlights: dict, idx: dict, has_wl: b
             row.update({k: v for k, v in m.items() if k != "event_id"})
             rows.append(row)
         if rows:
-            rows.sort(key=lambda r: r.get("citation_count", 0), reverse=True)
+            # membership order IS the skill's selection order — the rule already
+            # sorted it (citations, severity, date, …). Never re-sort here.
             spots.append({"name": spec.get("name", spec.get("key")),
                           "subtitle": spec.get("subtitle", ""), "rows": rows})
-    return {"dashboard": {"entity": meta.get("entity", ""), "window": meta.get("window", ""),
-                          "prepared": meta.get("prepared_at", ""),
-                          "mode": (meta.get("mode") or "base").title(),
-                          "total_pages_scanned": rec.get("total_candidates_scanned"),
-                          "total_events": rec.get("total_validated_events")},
-            "buckets": buckets, "spotlights": spots}
+    # value counts for any enrichment listed in meta.aggregate_counts, sorted by
+    # count — so the chat reads per-value totals instead of counting rows
+    aggregates = {}
+    for key in (meta.get("aggregate_counts") or []):
+        counts = {}
+        for evs in events.values():
+            for e in evs:
+                v = (e.get("enrichments") or {}).get(key)
+                if v not in (None, ""):
+                    counts[str(v)] = counts.get(str(v), 0) + 1
+        if counts:
+            aggregates[key] = [{"value": k, "count": n}
+                               for k, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
+    digest = {"dashboard": {"entity": meta.get("entity", ""), "window": meta.get("window", ""),
+                            "prepared": meta.get("prepared_at", ""),
+                            "mode": (meta.get("mode") or "base").title(),
+                            "total_pages_scanned": rec.get("total_candidates_scanned"),
+                            "total_events": rec.get("total_validated_events")},
+              "buckets": buckets, "spotlights": spots}
+    if aggregates:
+        digest["aggregates"] = aggregates
+    return digest
 
 
 def safe_title(name: str, used: set) -> str:
@@ -441,7 +481,7 @@ def build_xlsx(meta, events, spotlights, idx, links, watchlist, path):
             if col not in BASE_FIELDS and not any(x.get(col) not in (None, "") for _, x in resolved):
                 sys.stderr.write(f"build_report: warning — spotlight {key!r} column {col!r} is "
                                  f"empty in every row (missing from the membership rows?).\n")
-        resolved.sort(key=lambda pe: len(cites(pe[0])), reverse=True)
+        # keep the manifest's membership order (the skill's own sort) — see chat_digest
         rows = [row_values(e, cols, extra) for e, extra in resolved]
         write_grid(sheet(spec.get("name", key)), cols, rows, subtitle=spec.get("subtitle"))
 

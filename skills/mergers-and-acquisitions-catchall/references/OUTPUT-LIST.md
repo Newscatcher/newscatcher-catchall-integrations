@@ -20,9 +20,10 @@ events. No buckets, no watchlist.
 | `<slug>.json` | Full hierarchical dataset with metadata | Scripting / pipelines |
 | `<slug>.csv` | Flattened table, one row per event | BI / pandas / Numbers |
 
-`<slug>` = `<topic-slug>-<skill-name>`, lowercase, hyphenated — e.g.
-`ai-startups-fundraising`, `fintech-mergers-and-acquisitions`. Save all three
-to the current working directory unless the user says otherwise.
+`<slug>` = `<topic-slug>-<skill-name>`, lowercase, hyphenated, dropping the
+skill name's `-catchall` suffix — e.g. `ai-startups-fundraising`,
+`fintech-mergers-and-acquisitions`. Save all three to the current working
+directory unless the user says otherwise.
 
 All three downloads are built by the bundled **`scripts/build_downloads.py`**
 (never hand-written with the `Write` tool). See **§ Downloads** for when (auto
