@@ -9,7 +9,7 @@ name: Build skill zips
 on:
   push:
     branches: [main]
-    paths: ['skills/**']
+    paths: ['skills/**', '.github/workflows/build-skill-zips.yml']
   workflow_dispatch:
 
 permissions:
@@ -43,6 +43,16 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view skills-latest >/dev/null 2>&1; then
+            # Drop any asset that no longer has a matching skill. --clobber
+            # overwrites same-named zips but leaves orphans behind, so a renamed
+            # or deleted skill would otherwise linger as a stale download.
+            gh release view skills-latest --json assets -q '.assets[].name' \
+              | while read -r asset; do
+                  if [ ! -f "dist/$asset" ]; then
+                    echo "removing stale asset $asset"
+                    gh release delete-asset skills-latest "$asset" -y
+                  fi
+                done
             gh release upload skills-latest dist/*.zip --clobber
           else
             gh release create skills-latest dist/*.zip \
